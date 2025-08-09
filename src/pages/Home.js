@@ -148,7 +148,13 @@ export default function Home() {
       const snap = await getDocs(q);
       const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setQuestions(arr);
-      setActiveQuestionId((prev) => (prev >= arr.length ? arr[0].id : prev));
+      if (arr.length > 0) {
+        setActiveQuestionId((prev) =>
+          prev >= arr.length ? arr[0].id || null : prev
+        );
+      } else {
+        setActiveQuestionId(null);
+      }
       setMode("view");
       setNoteEdit("");
     } catch (e) {
