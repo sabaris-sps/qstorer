@@ -23,6 +23,7 @@ export default function CreateChapter() {
       <h2>Create Chapter</h2>
       <input
         value={name}
+        type="text"
         onChange={(e) => setName(e.target.value)}
         placeholder="Chapter name"
       />

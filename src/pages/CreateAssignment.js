@@ -36,6 +36,7 @@ export default function CreateAssignment() {
 
       <input
         value={name}
+        type="text"
         onChange={(e) => setName(e.target.value)}
         placeholder="Assignment name"
       />
