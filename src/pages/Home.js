@@ -148,7 +148,7 @@ export default function Home() {
       const snap = await getDocs(q);
       const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setQuestions(arr);
-      setActiveQuestionId(arr.length ? arr[0].id : null);
+      setActiveQuestionId((prev) => (prev >= arr.length ? arr[0].id : prev));
       setMode("view");
       setNoteEdit("");
     } catch (e) {
@@ -589,7 +589,6 @@ export default function Home() {
                 onChange={(e) => setNewNoteText(e.target.value)}
               />
 
-              <label>Images</label>
               <input
                 type="file"
                 multiple
@@ -602,7 +601,7 @@ export default function Home() {
                 </button>
                 <button
                   type="button"
-                  className="ghost"
+                  className="ghost-btn"
                   onClick={() => setMode("view")}
                 >
                   Cancel

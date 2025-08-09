@@ -79,7 +79,7 @@ export default function QuestionView() {
 
   return (
     <div className="form-page">
-      <button className="link-btn ghost-btn" onClick={() => navigate(-1)}>
+      <button className="link-btn" onClick={() => navigate(-1)}>
         ← Back
       </button>
 

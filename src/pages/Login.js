@@ -1,13 +1,15 @@
 // src/pages/Login.js
-import React, { useState } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebase";
 import { useNavigate, Link } from "react-router-dom";
+import { AppContext } from "../App";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [err, setErr] = useState(null);
+  const { user } = useContext(AppContext);
   const nav = useNavigate();
 
   async function handleLogin(e) {
@@ -20,12 +22,19 @@ export default function Login() {
     }
   }
 
+  useEffect(() => {
+    if (user) {
+      nav("/");
+    }
+  }, [nav, user]);
+
   return (
     <div className="form-page center">
       <h2>Login</h2>
       <input
         placeholder="Email"
         value={email}
+        type="email"
         onChange={(e) => setEmail(e.target.value)}
       />
       <input

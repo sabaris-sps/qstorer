@@ -1,16 +1,13 @@
-/* src/App.css */
 :root {
-  --primary: #4a6fa5;
-  --primary-light: #6d8fc7;
-  --primary-dark: #2c4a7a;
+  --primary: #2c3e50;
+  --secondary: #3498db;
   --danger: #e74c3c;
-  --danger-light: #ff6b6b;
-  --text: #333;
-  --text-light: #666;
-  --border: #ddd;
-  --bg-light: #f8f9fa;
-  --bg: #fff;
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --success: #27ae60;
+  --warning: #f39c12;
+  --light: #ecf0f1;
+  --dark: #2c3e50;
+  --gray: #95a5a6;
+  --shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 * {
@@ -20,10 +17,10 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  color: var(--text);
-  background-color: var(--bg-light);
-  line-height: 1.5;
+  font-family: Arial, sans-serif;
+  background-color: #f5f5f5;
+  color: #333;
+  line-height: 1.6;
 }
 
 .app-root {
@@ -32,302 +29,340 @@ body {
   min-height: 100vh;
 }
 
-/* Header styles */
+/* Compact Topbar Styles */
 .topbar {
-  background-color: var(--primary);
+  height: 50px;
+  /* Reduced from default */
+  padding: 0 15px;
+  /* Reduced vertical padding */
+  background-color: #2c3e50;
   color: white;
-  padding: 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: var(--shadow);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .brand-link {
   color: white;
   text-decoration: none;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   font-weight: bold;
 }
 
 .toplinks {
   display: flex;
-  gap: 1rem;
+  gap: 12px;
+  /* Reduced gap between links */
 }
 
 .toplink {
-  color: white;
+  font-size: 0.9rem;
+  /* Smaller font size */
+  padding: 5px 8px;
+  /* More compact padding */
   text-decoration: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+  color: white;
+  border-radius: 3px;
   transition: background-color 0.2s;
 }
 
 .toplink:hover {
-  background-color: var(--primary-dark);
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Content area */
-.content {
-  flex: 1;
-  padding: 1rem;
-  max-width: 1400px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-/* Form styles */
-.form-page {
-  max-width: 600px;
-  margin: 2rem auto;
-  padding: 1.5rem;
-  background-color: var(--bg);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
-}
-
-.form-page.center {
-  text-align: center;
-}
-
-.form-page h2 {
-  margin-bottom: 1.5rem;
-  color: var(--primary);
-}
-
-input,
-textarea,
-select {
-  padding: 5px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-textarea {
-  min-height: 100px;
-  resize: vertical;
-}
-
-label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-}
-
-/* Button styles */
-button,
-.btn {
-  padding: 0.5rem 1rem;
-  /* Reduced from 0.75rem 1.5rem */
-  border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  /* Reduced from 1rem */
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.primary {
-  background-color: var(--primary);
-  color: white;
-}
-
-.primary:hover {
-  background-color: var(--primary-dark);
-}
-
-.primary.small {
-  padding: 0.3rem 0.7rem;
-  /* Reduced from 0.5rem 1rem */
-  font-size: 0.8rem;
-  /* Reduced from 0.9rem */
-}
-
-.ghost-btn {
-  padding: 0.4rem 0.8rem;
-  /* Added specific padding for ghost buttons */
-  background-color: transparent;
-  color: var(--primary);
-  border: 1px solid var(--primary);
-  font-size: 0.9rem;
-  /* Consistent with other buttons */
-}
-
-.ghost-btn:hover {
-  background-color: rgba(74, 111, 165, 0.1);
-}
-
-.link-btn {
+/* Make logout button blend in better */
+.toplink[onclick] {
   background: none;
   border: none;
-  color: var(--primary);
-  text-decoration: underline;
   cursor: pointer;
-  padding: 0;
+  font-family: inherit;
+  font-size: 0.9rem;
 }
 
-/* Home page grid layout */
+/* Main content layout */
+.content {
+  flex: 1;
+  padding: 20px;
+}
+
+/* Home page grid */
 .home-grid {
   display: grid;
   grid-template-columns: 250px 1fr;
   grid-template-rows: auto 1fr;
-  gap: 1rem;
-  height: calc(100vh - 72px);
+  gap: 20px;
+  height: calc(100vh - 70px);
 }
 
 .selection-bar {
   grid-column: 1 / -1;
-  background-color: #eaf2f8;
-  padding: 1rem;
+  background-color: white;
+  padding: 15px;
   border-radius: 8px;
+  box-shadow: var(--shadow);
   display: flex;
+  gap: 20px;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 1.5rem;
 }
 
 .sel-item {
-  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sel-item label {
+  font-weight: lighter;
+}
+
+.sel-item select {
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  min-width: 200px;
+}
+
+.sel-actions {
+  margin-left: auto;
   display: flex;
   gap: 10px;
-  align-items: flex-start;
 }
 
-/* Update the sel-actions to use smaller buttons */
-.sel-actions {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  /* Better vertical alignment */
-}
-
-.sel-actions .ghost-btn {
-  padding: 0.3rem 0.6rem;
-  /* Even more compact */
-  font-size: 0.85rem;
-}
-
+/* Left panel (question numbers) */
 .left-panel {
-  background-color: var(--bg);
+  background-color: white;
   border-radius: 8px;
+  padding: 15px;
   box-shadow: var(--shadow);
-  padding: 1rem;
   overflow-y: auto;
-  width: 200px
 }
 
-.main-panel {
-  background-color: var(--bg);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
-  padding: 1.5rem;
-  overflow-y: auto;
-
-}
-
-/* Question panel styles */
 .qp-header {
-  font-weight: bold;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border);
+  font-size: 1.2rem;
+  font-weight: lighter;
+  margin-bottom: 15px;
+  color: var(--primary);
 }
 
 .q-grid {
-  /* display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-  gap: 0.5rem; */
-
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 50px;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 6px;
 }
 
 .num-btn {
-
+  width: 45px;
+  height: 36px;
+  border-radius: 4px;
+  border: none;
   background-color: #3498db;
   color: white;
-  padding: 8px;
-  text-align: center;
-  border-radius: 4px;
+  font-weight: lighter;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.3s;
   position: relative;
+  margin: 2px;
 }
 
 .num-btn:hover {
-  background-color: var(--primary-light);
-  color: white;
-  border-color: var(--primary-light);
+  background-color: #2980b9;
 }
 
 .num-btn.active {
   background-color: #e74c3c;
-  color: white;
 }
 
 .num-btn.plus {
-  font-size: 1.5rem;
-  line-height: 1;
+  background-color: #27ae60;
+  font-size: larger;
+}
+
+.num-btn.plus:hover {
+  background-color: #2ecc71;
+}
+
+/* Main panel */
+.main-panel {
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  overflow-y: auto;
+}
+
+.placeholder {
+  color: var(--gray);
+  text-align: center;
+  padding: 40px;
 }
 
 /* Question card styles */
 .question-card {
-  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
 }
 
 .qhead {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+  margin-bottom: 15px;
 }
 
 .qtext {
-  margin-bottom: 1.5rem;
-  white-space: pre-wrap;
+  font-size: 1.1rem;
+  line-height: 1.6;
 }
 
 .image-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin: 15px 0;
 }
 
 .image-list img {
-  width: 100%;
-  max-height: 200px;
-  object-fit: contain;
-  border: 1px solid var(--border);
+  max-width: 100%;
+  border: 1px solid #ddd;
   border-radius: 4px;
 }
 
 .note-section {
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
+  margin-top: 20px;
+}
+
+.note-section label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.note-section textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: inherit;
 }
 
 .upload-more {
-  padding: 1rem;
-  background-color: var(--bg-light);
+  margin-top: 20px;
+}
+
+.upload-more label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+
+}
+
+/* Form styles */
+.form-page {
+  max-width: 600px;
+  margin: 0 auto;
+  background-color: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.form-page.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.form-page h2 {
+  margin-bottom: 20px;
+  color: var(--primary);
+}
+
+.form-page input[type="text"],
+.form-page input[type="email"],
+.form-page input[type="password"],
+.form-page textarea,
+.form-page select {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+input[type="file"]::file-selector-button {
+  background-color: #4CAF50;
+  color: white;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.form-page textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+/* Button styles */
+button {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.primary {
+  background-color: var(--secondary);
+  color: white;
+  border: none;
+  padding: 10px 20px;
   border-radius: 4px;
 }
 
-/* Placeholder styles */
-.placeholder {
-  text-align: center;
-  padding: 2rem;
-  color: var(--text-light);
+.primary:hover {
+  background-color: #2980b9;
+}
+
+.primary.small {
+  padding: 8px 15px;
+  font-size: 0.9rem;
+}
+
+.ghost-btn {
+  background: none;
+  border: 1px solid var(--secondary);
+  color: var(--secondary);
+  padding: 8px 15px;
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.ghost-btn:hover {
+  background-color: rgba(52, 152, 219, 0.1);
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--secondary);
+  text-decoration: underline;
+  padding: 0;
+  margin-bottom: 15px;
+}
+
+.link-btn:hover {
+  color: #2980b9;
 }
 
 /* Toast notification */
@@ -335,35 +370,23 @@ button:disabled {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  padding: 1rem 1.5rem;
-  background-color: var(--primary);
+  background-color: var(--success);
   color: white;
+  padding: 12px 20px;
   border-radius: 4px;
   box-shadow: var(--shadow);
-  animation: fadeIn 0.3s;
   z-index: 1000;
+  animation: fadeIn 0.3s;
 }
 
 .toast.error {
   background-color: var(--danger);
 }
 
-/* Add this new rule for form action buttons */
-.form-actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 1rem;
-}
-
-.form-actions button {
-  flex: 1;
-  /* Makes buttons share space equally */
-}
-
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(20px);
   }
 
   to {
@@ -372,23 +395,11 @@ button:disabled {
   }
 }
 
-/* Utility classes */
-.hint {
-  font-size: 0.9rem;
-  color: var(--text-light);
-  margin-bottom: 1rem;
-}
-
-.center {
-  text-align: center;
-}
-
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .home-grid {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto 1fr;
-    height: auto;
   }
 
   .left-panel {
@@ -401,14 +412,17 @@ button:disabled {
 
   .selection-bar {
     flex-direction: column;
-    gap: 1rem;
-  }
-
-  .sel-item {
-    width: 100%;
+    align-items: flex-start;
+    gap: 10px;
   }
 
   .sel-actions {
+    margin-left: 0;
+    width: 100%;
     justify-content: flex-end;
+  }
+
+  .q-grid {
+    grid-template-columns: repeat(6, 1fr);
   }
 }
