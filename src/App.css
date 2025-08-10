@@ -83,7 +83,7 @@ body {
 /* Main content layout */
 .content {
   flex: 1;
-  padding: 20px;
+  /* padding: 20px; */
 }
 
 /* Home page grid */
@@ -91,16 +91,16 @@ body {
   display: grid;
   grid-template-columns: 250px 1fr;
   grid-template-rows: auto 1fr;
-  gap: 20px;
-  height: calc(100vh - 70px);
+  /* gap: 20px; */
+  height: 100vh
 }
 
 .selection-bar {
   grid-column: 1 / -1;
-  background-color: white;
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: var(--shadow);
+  background-color: #e0ffff2b;
+  padding: 10px;
+  /* border-radius: 8px; */
+  /* box-shadow: var(--shadow); */
   display: flex;
   gap: 20px;
   align-items: center;
@@ -121,7 +121,7 @@ body {
   padding: 8px 12px;
   border-radius: 4px;
   border: 1px solid #ddd;
-  min-width: 200px;
+  /* min-width: 200px; */
 }
 
 .sel-actions {
@@ -132,8 +132,8 @@ body {
 
 /* Left panel (question numbers) */
 .left-panel {
-  background-color: white;
-  border-radius: 8px;
+  background-color: #2c3e50;
+  /* border-radius: 8px; */
   padding: 15px;
   box-shadow: var(--shadow);
   overflow-y: auto;
@@ -141,9 +141,9 @@ body {
 
 .qp-header {
   font-size: 1.2rem;
-  font-weight: lighter;
+  font-weight: bold;
   margin-bottom: 15px;
-  color: var(--primary);
+  color: white;
 }
 
 .q-grid {
@@ -189,10 +189,11 @@ body {
 /* Main panel */
 .main-panel {
   background-color: white;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: var(--shadow);
+  /* border-radius: 8px; */
+  padding: 10px;
+  /* box-shadow: var(--shadow); */
   overflow-y: auto;
+  border-left: 1px solid #00000040;
 }
 
 .placeholder {
@@ -205,7 +206,7 @@ body {
 .question-card {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  /* gap: 15px; */
 }
 
 .qhead {
@@ -237,11 +238,13 @@ body {
 
 .note-section {
   margin-top: 20px;
+  border-bottom: 1px solid #eee;
 }
 
 .note-section label {
   display: block;
   margin-bottom: 8px;
+  font-weight: bold;
 }
 
 .note-section textarea {
@@ -253,6 +256,11 @@ body {
   font-family: inherit;
 }
 
+.note-section button {
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
 .upload-more {
   margin-top: 20px;
 }
@@ -260,12 +268,17 @@ body {
 .upload-more label {
   display: block;
   margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.upload-more button {
+  font-size: smaller;
+  padding: 8px 8px;
 }
 
 .form-actions {
   display: flex;
   gap: 10px;
-
 }
 
 /* Form styles */
@@ -276,6 +289,7 @@ body {
   padding: 30px;
   border-radius: 8px;
   box-shadow: var(--shadow);
+  margin-top: 10%;
 }
 
 .form-page.center {
@@ -303,12 +317,19 @@ body {
 }
 
 input[type="file"]::file-selector-button {
-  background-color: #4CAF50;
-  color: white;
-  padding: 8px 12px;
-  border: none;
+  background-color: white;
+  color: black;
+  padding: 8px 8px;
+  border: 1px solid #333;
   border-radius: 4px;
   cursor: pointer;
+  font-size: small;
+  transition: all 0.3s;
+}
+
+
+input[type="file"]::file-selector-button:hover {
+  background-color: #eee;
 }
 
 .form-page textarea {

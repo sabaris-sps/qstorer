@@ -494,7 +494,7 @@ export default function Home() {
             value={selectedChapter || ""}
             onChange={(e) => setSelectedChapter(e.target.value)}
           >
-            <option value="">-- Select Chapter --</option>
+            <option value="">Select Chapter</option>
             {chapters.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -509,7 +509,7 @@ export default function Home() {
             value={selectedAssignment || ""}
             onChange={(e) => setSelectedAssignment(e.target.value)}
           >
-            <option value="">-- Select Assignment --</option>
+            <option value="">Select Assignment</option>
             {assignments.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
@@ -642,7 +642,7 @@ export default function Home() {
             </div>
 
             <div className="note-section">
-              <label>Edit Note</label>
+              <label>Note</label>
               <textarea
                 value={noteEdit}
                 onChange={(e) => setNoteEdit(e.target.value)}
@@ -655,7 +655,7 @@ export default function Home() {
             </div>
 
             <div className="upload-more" style={{ marginTop: 12 }}>
-              <label>Upload more images</label>
+              <label>Upload More Images</label>
               <input
                 type="file"
                 multiple
@@ -663,7 +663,7 @@ export default function Home() {
               />
               <div style={{ marginTop: 8 }}>
                 <button
-                  className="primary small"
+                  className="ghost-btn small"
                   onClick={handleUploadMoreImages}
                 >
                   Upload & Append
