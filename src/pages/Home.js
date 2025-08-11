@@ -17,6 +17,8 @@ import { uploadToImgBB } from "../imgbb";
 import { v4 as uuidv4 } from "uuid";
 import { auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
+import "react-photo-view/dist/react-photo-view.css";
+import { PhotoProvider, PhotoView } from "react-photo-view";
 
 /* Toast component */
 function Toast({ toast }) {
@@ -635,11 +637,15 @@ export default function Home() {
 
             <div className="qtext">{activeQuestion.text}</div>
 
-            <div className="image-list">
-              {(activeQuestion.images || []).map((u, i) => (
-                <img key={i} src={u} alt={`q-${activeQuestion.number}-${i}`} />
-              ))}
-            </div>
+            <PhotoProvider key={activeQuestion.id}>
+              <div className="foo">
+                {(activeQuestion.images || []).map((item, index) => (
+                  <PhotoView key={index} src={item}>
+                    <img src={item} alt="" className="thumbnail" />
+                  </PhotoView>
+                ))}
+              </div>
+            </PhotoProvider>
 
             <div className="note-section">
               <label>Note</label>

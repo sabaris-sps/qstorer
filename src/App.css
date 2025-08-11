@@ -404,6 +404,16 @@ button {
   background-color: var(--danger);
 }
 
+/* Photo View Image */
+.thumbnail {
+  aspect-ratio: 1 / 1;
+  max-width: 200px;
+  object-fit: cover;
+  object-position: center;
+  cursor: pointer;
+  border: 1px solid #ccc;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
