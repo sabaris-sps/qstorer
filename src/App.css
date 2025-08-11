@@ -92,7 +92,7 @@ body {
   grid-template-columns: 250px 1fr;
   grid-template-rows: auto 1fr;
   /* gap: 20px; */
-  height: 100vh
+  height: calc(100vh - 50px)
 }
 
 .selection-bar {
@@ -263,12 +263,9 @@ body {
 
 .upload-more {
   margin-top: 20px;
-}
-
-.upload-more label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: bold;
+  display: flex;
+  gap: 10px;
+  flex-direction: column;
 }
 
 .upload-more button {

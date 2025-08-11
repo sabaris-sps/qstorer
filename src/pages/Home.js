@@ -19,6 +19,7 @@ import { auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import "react-photo-view/dist/react-photo-view.css";
 import { PhotoProvider, PhotoView } from "react-photo-view";
+import { FileUploader } from "react-drag-drop-files";
 
 /* Toast component */
 function Toast({ toast }) {
@@ -48,13 +49,14 @@ export default function Home() {
   const [toast, setToast] = useState(null);
 
   // create-mode form
-  const [newQuestionText, setNewQuestionText] = useState("");
   const [newNoteText, setNewNoteText] = useState("");
   const [newFiles, setNewFiles] = useState([]);
 
   // view-mode edit fields
   const [noteEdit, setNoteEdit] = useState("");
   const [moreFiles, setMoreFiles] = useState([]);
+  const [saveNoteBtn, setSaveNoteBtn] = useState(true);
+  const [uploadImagesBtn, setUploadImagesBtn] = useState(true);
 
   const nav = useNavigate();
 
@@ -89,12 +91,6 @@ export default function Home() {
     }
     loadQuestions();
   }, [selectedAssignment]);
-
-  function uidPath(...parts) {
-    // helper to build path under users/{uid}/...
-    const uid = auth.currentUser?.uid;
-    return ["users", uid, ...parts];
-  }
 
   function showToast(message, type = "success") {
     const id = uuidv4();
@@ -167,8 +163,8 @@ export default function Home() {
   // create question (in create-mode)
   async function handleCreateQuestion(e) {
     e.preventDefault();
-    if (!newQuestionText.trim()) {
-      showToast("Enter question text", "error");
+    if (!newNoteText.trim() && newFiles.length === 0) {
+      showToast("Enter question note/image", "error");
       return;
     }
     if (!selectedChapter || !selectedAssignment) {
@@ -200,7 +196,7 @@ export default function Home() {
       ).docs.find((d) => d.id === selectedAssignment);
       const asgName = asgDoc?.data()?.name || "assignment";
 
-      // upload images to ImgBB with naming
+      // upload images to cloudinary
       const uploaded = [];
       for (const f of newFiles) {
         const name = `${chapName}-${asgName}-${nextNum}-${Date.now()}`;
@@ -208,7 +204,7 @@ export default function Home() {
         uploaded.push(url);
       }
 
-      await addDoc(
+      const new_question = await addDoc(
         collection(
           db,
           "users",
@@ -221,17 +217,16 @@ export default function Home() {
         ),
         {
           number: nextNum,
-          text: newQuestionText,
           note: newNoteText,
           images: uploaded,
         }
       );
 
       showToast("Question created");
-      setNewQuestionText("");
       setNewNoteText("");
       setNewFiles([]);
       await loadQuestions();
+      setActiveQuestionId(new_question.id);
       setMode("view");
     } catch (err) {
       console.error(err);
@@ -251,6 +246,7 @@ export default function Home() {
   async function handleSaveNote() {
     if (!activeQuestionId) return;
     try {
+      setSaveNoteBtn(false);
       const uid = auth.currentUser.uid;
       const dref = doc(
         db,
@@ -264,11 +260,13 @@ export default function Home() {
         activeQuestionId
       );
       await updateDoc(dref, { note: noteEdit });
+      setSaveNoteBtn(true);
       showToast("Note saved");
       await loadQuestions();
     } catch (e) {
       console.error(e);
       showToast("Save failed", "error");
+      setSaveNoteBtn(true);
     }
   }
 
@@ -276,6 +274,7 @@ export default function Home() {
   async function handleUploadMoreImages() {
     if (!activeQuestionId || !moreFiles.length) return;
     try {
+      setUploadImagesBtn(false);
       const uid = auth.currentUser.uid;
 
       // fetch names
@@ -315,11 +314,13 @@ export default function Home() {
       }
 
       showToast("Images added");
+      setUploadImagesBtn(true);
       setMoreFiles([]);
       await loadQuestions();
     } catch (e) {
       console.error(e);
       showToast("Upload failed", "error");
+      setUploadImagesBtn(true);
     }
   }
 
@@ -467,17 +468,6 @@ export default function Home() {
     }
   }
 
-  // Helper to reload chapters (exposed to other pages)
-  async function loadChaptersForUser() {
-    try {
-      const uid = auth.currentUser.uid;
-      const snap = await getDocs(collection(db, "users", uid, "chapters"));
-      setChapters(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
   // expose reload when user logs in
   useEffect(() => {
     if (user) loadChaptersForUser();
@@ -525,6 +515,7 @@ export default function Home() {
             className="ghost-btn"
             onClick={() => {
               if (user) loadChaptersForUser();
+              handleSelectQuestion(activeQuestionId);
             }}
           >
             Reload
@@ -565,6 +556,7 @@ export default function Home() {
             <button
               className="num-btn plus"
               onClick={() => {
+                setActiveQuestionId(null);
                 setMode("create");
               }}
             >
@@ -585,22 +577,26 @@ export default function Home() {
           <div className="form-page">
             <h2>Create Question</h2>
             <form onSubmit={handleCreateQuestion}>
-              <label>Question</label>
+              {/* <label>Question</label>
               <textarea
+                id="new-question-title"
                 value={newQuestionText}
                 onChange={(e) => setNewQuestionText(e.target.value)}
-              />
+              /> */}
 
-              <label>Note (optional)</label>
+              <label style={{ fontWeight: "bold" }}>Note</label>
               <textarea
+                id="new-question-note"
                 value={newNoteText}
                 onChange={(e) => setNewNoteText(e.target.value)}
               />
 
-              <input
-                type="file"
+              <FileUploader
+                handleChange={(files) => setNewFiles([...files])}
+                name="new-question-files"
+                types={["JPG", "PNG", "GIF", "JPEG"]}
+                maxSize={10}
                 multiple
-                onChange={(e) => setNewFiles([...e.target.files])}
               />
 
               <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
@@ -624,7 +620,7 @@ export default function Home() {
         ) : activeQuestion ? (
           <div className="question-card">
             <div className="qhead">
-              <h3>Q{activeQuestion.number}</h3>
+              <h3>Question {activeQuestion.number}</h3>
               <div>
                 <button
                   className="ghost-btn"
@@ -635,7 +631,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="qtext">{activeQuestion.text}</div>
+            {/* <div className="qtext">{activeQuestion.text}</div> */}
 
             <PhotoProvider key={activeQuestion.id}>
               <div className="foo">
@@ -654,26 +650,50 @@ export default function Home() {
                 onChange={(e) => setNoteEdit(e.target.value)}
               />
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                <button className="primary" onClick={handleSaveNote}>
-                  Save Note
-                </button>
+                {saveNoteBtn ? (
+                  <button className="primary" onClick={handleSaveNote}>
+                    Save Note
+                  </button>
+                ) : (
+                  <button
+                    className="primary"
+                    style={{ cursor: "no-drop" }}
+                    disabled
+                  >
+                    Loading...
+                  </button>
+                )}
               </div>
             </div>
 
-            <div className="upload-more" style={{ marginTop: 12 }}>
-              <label>Upload More Images</label>
-              <input
-                type="file"
+            <div className="upload-more">
+              <label style={{ fontWeight: "bold" }}>Upload More Images</label>
+
+              <FileUploader
+                handleChange={(files) => setMoreFiles([...files])}
+                name="more-files"
+                types={["JPG", "PNG", "GIF", "JPEG"]}
+                maxSize={10}
                 multiple
-                onChange={(e) => setMoreFiles([...e.target.files])}
               />
+
               <div style={{ marginTop: 8 }}>
-                <button
-                  className="ghost-btn small"
-                  onClick={handleUploadMoreImages}
-                >
-                  Upload & Append
-                </button>
+                {uploadImagesBtn ? (
+                  <button
+                    className="ghost-btn small"
+                    onClick={handleUploadMoreImages}
+                  >
+                    Upload & Append
+                  </button>
+                ) : (
+                  <button
+                    className="ghost-btn small"
+                    style={{ cursor: "no-drop" }}
+                    disabled
+                  >
+                    Loading...
+                  </button>
+                )}
               </div>
             </div>
           </div>
