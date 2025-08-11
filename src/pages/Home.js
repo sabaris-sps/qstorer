@@ -13,7 +13,7 @@ import {
   arrayUnion,
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { uploadToImgBB } from "../imgbb";
+import { uploadToCloudinary } from "../cloudinary";
 import { v4 as uuidv4 } from "uuid";
 import { auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
@@ -204,7 +204,7 @@ export default function Home() {
       const uploaded = [];
       for (const f of newFiles) {
         const name = `${chapName}-${asgName}-${nextNum}-${Date.now()}`;
-        const url = await uploadToImgBB(f, name);
+        const url = await uploadToCloudinary(f, name);
         uploaded.push(url);
       }
 
@@ -295,7 +295,7 @@ export default function Home() {
       const urls = [];
       for (const f of moreFiles) {
         const name = `${chapName}-${asgName}-${qNum}-${Date.now()}`;
-        const url = await uploadToImgBB(f, name);
+        const url = await uploadToCloudinary(f, name);
         urls.push(url);
       }
 
