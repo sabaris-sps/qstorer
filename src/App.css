@@ -236,6 +236,15 @@ body {
   border-radius: 4px;
 }
 
+.delete-img-btn {
+  background: none;
+  border: 1px solid var(--secondary);
+  color: var(--secondary);
+  padding: 8px 15px;
+  border-radius: 4px;
+  text-decoration: none;
+}
+
 .note-section {
   margin-top: 20px;
   border-bottom: 1px solid #eee;

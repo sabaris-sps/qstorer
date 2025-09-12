@@ -11,9 +11,10 @@ import {
   deleteDoc,
   updateDoc,
   arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { uploadToCloudinary } from "../cloudinary";
+import { deleteFromCloudinary, uploadToCloudinary } from "../cloudinary";
 import { v4 as uuidv4 } from "uuid";
 import { auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
@@ -57,6 +58,10 @@ export default function Home() {
   const [moreFiles, setMoreFiles] = useState([]);
   const [saveNoteBtn, setSaveNoteBtn] = useState(true);
   const [uploadImagesBtn, setUploadImagesBtn] = useState(true);
+
+  //photo viewer
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
 
   const nav = useNavigate();
 
@@ -309,9 +314,7 @@ export default function Home() {
         "questions",
         activeQuestionId
       );
-      for (const u of urls) {
-        await updateDoc(dref, { images: arrayUnion(u) });
-      }
+      await updateDoc(dref, { images: arrayUnion(...urls) });
 
       showToast("Images added");
       setUploadImagesBtn(true);
@@ -328,6 +331,11 @@ export default function Home() {
   async function handleDeleteQuestion(qid) {
     if (!window.confirm("Delete this question?")) return;
     try {
+      (activeQuestion.images || []).map(async (img_url, i) => {
+        const public_id = img_url.split("/").pop().split(".")[0];
+        await deleteFromCloudinary(public_id);
+      });
+
       const uid = auth.currentUser.uid;
       await deleteDoc(
         doc(
@@ -468,10 +476,44 @@ export default function Home() {
     }
   }
 
+  async function handleDeleteImage() {
+    const index = photoIndex;
+    if (!window.confirm(`Delete this image (image number: ${index + 1}?`))
+      return;
+    try {
+      const img_url = activeQuestion.images[index];
+      const public_id = img_url.split("/").pop().split(".")[0];
+      await deleteFromCloudinary(public_id);
+
+      const uid = auth.currentUser.uid;
+      const dref = doc(
+        db,
+        "users",
+        uid,
+        "chapters",
+        selectedChapter,
+        "assignments",
+        selectedAssignment,
+        "questions",
+        activeQuestionId
+      );
+
+      await updateDoc(dref, { images: arrayRemove(img_url) });
+      await loadQuestions();
+      setPhotoViewerVisible(false);
+    } catch (error) {
+      console.error("error deleting image", error);
+    }
+  }
+
   // expose reload when user logs in
   useEffect(() => {
     if (user) loadChaptersForUser();
   }, [user]);
+
+  useEffect(() => {
+    setPhotoIndex(0);
+  }, [activeQuestionId]);
 
   // activeQuestion object
   const activeQuestion = questions.find((q) => q.id === activeQuestionId);
@@ -631,13 +673,29 @@ export default function Home() {
               </div>
             </div>
 
-            {/* <div className="qtext">{activeQuestion.text}</div> */}
-
-            <PhotoProvider key={activeQuestion.id}>
+            <PhotoProvider
+              key={activeQuestion.id}
+              index={photoIndex}
+              visible={photoViewerVisible}
+              onVisibleChange={setPhotoViewerVisible}
+              onIndexChange={setPhotoIndex}
+              toolbarRender={() => {
+                return (
+                  <>
+                    <button
+                      className="delete-img-btn"
+                      onClick={handleDeleteImage}
+                    >
+                      Delete
+                    </button>
+                  </>
+                );
+              }}
+            >
               <div className="foo">
-                {(activeQuestion.images || []).map((item, index) => (
-                  <PhotoView key={index} src={item}>
-                    <img src={item} alt="" className="thumbnail" />
+                {(activeQuestion.images || []).map((img_url, index) => (
+                  <PhotoView key={index} src={img_url}>
+                    <img src={img_url} alt="" className="thumbnail" />
                   </PhotoView>
                 ))}
               </div>
