@@ -1,4 +1,3 @@
-// src/pages/Home.js
 import React, { useContext, useEffect, useState } from "react";
 import { AppContext } from "../App";
 import {
@@ -65,6 +64,13 @@ export default function Home() {
 
   const nav = useNavigate();
 
+  // Move-popup related state
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [moveTargetChapter, setMoveTargetChapter] = useState("");
+  const [moveTargetAssignment, setMoveTargetAssignment] = useState("");
+  const [moveLoading, setMoveLoading] = useState(false);
+  const [assignmentsByChapter, setAssignmentsByChapter] = useState({});
+
   // require login
   useEffect(() => {
     if (!auth.currentUser) {
@@ -85,6 +91,7 @@ export default function Home() {
       return;
     }
     loadAssignments();
+    // eslint-disable-next-line
   }, [selectedChapter, user]);
 
   // load questions when assignment changes
@@ -95,7 +102,16 @@ export default function Home() {
       return;
     }
     loadQuestions();
+    // eslint-disable-next-line
   }, [selectedAssignment]);
+
+  // preload assignments map when chapters change (makes move popup snappier)
+  useEffect(() => {
+    if (chapters && chapters.length > 0 && user) {
+      loadAssignmentsForAllChapters();
+    }
+    // eslint-disable-next-line
+  }, [chapters, user]);
 
   function showToast(message, type = "success") {
     const id = uuidv4();
@@ -509,6 +525,7 @@ export default function Home() {
   // expose reload when user logs in
   useEffect(() => {
     if (user) loadChaptersForUser();
+    // eslint-disable-next-line
   }, [user]);
 
   useEffect(() => {
@@ -517,6 +534,166 @@ export default function Home() {
 
   // activeQuestion object
   const activeQuestion = questions.find((q) => q.id === activeQuestionId);
+
+  // --------------------- Move-popup helpers ---------------------
+  // load assignments for all chapters and cache them
+  async function loadAssignmentsForAllChapters() {
+    try {
+      if (!user) return {};
+      const uid = auth.currentUser.uid;
+      const map = {};
+      for (const chap of chapters) {
+        const snap = await getDocs(
+          collection(db, "users", uid, "chapters", chap.id, "assignments")
+        );
+        map[chap.id] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      }
+      setAssignmentsByChapter(map);
+      return map;
+    } catch (e) {
+      console.error("loadAssignmentsForAllChapters", e);
+      showToast("Failed to load assignments", "error");
+      return {};
+    }
+  }
+
+  function openMoveUI() {
+    if (!activeQuestion) {
+      showToast("Select a question first", "error");
+      return;
+    }
+    setMoveOpen(true);
+    setMoveTargetChapter(selectedChapter || "");
+    setMoveTargetAssignment(selectedAssignment || "");
+    loadAssignmentsForAllChapters();
+  }
+
+  async function handleMoveQuestion() {
+    if (!activeQuestionId || !activeQuestion) {
+      showToast("No active question", "error");
+      return;
+    }
+    if (!moveTargetChapter || !moveTargetAssignment) {
+      showToast("Select destination chapter & assignment", "error");
+      return;
+    }
+    if (
+      moveTargetChapter === selectedChapter &&
+      moveTargetAssignment === selectedAssignment
+    ) {
+      showToast("Question is already in the selected assignment", "error");
+      return;
+    }
+
+    setMoveLoading(true);
+    try {
+      const uid = auth.currentUser.uid;
+
+      // fresh src ref
+      const srcRef = doc(
+        db,
+        "users",
+        uid,
+        "chapters",
+        selectedChapter,
+        "assignments",
+        selectedAssignment,
+        "questions",
+        activeQuestionId
+      );
+
+      const srcData = activeQuestion; // using local state; you may fetch fresh if needed
+
+      // determine next number in destination
+      const destQSnap = await getDocs(
+        query(
+          collection(
+            db,
+            "users",
+            uid,
+            "chapters",
+            moveTargetChapter,
+            "assignments",
+            moveTargetAssignment,
+            "questions"
+          ),
+          orderBy("number", "asc")
+        )
+      );
+      const destNextNum = destQSnap.size + 1;
+
+      const newQuestionPayload = {
+        ...((srcData && {
+          note: srcData.note,
+          images: srcData.images || [],
+        }) || {
+          note: "",
+          images: [],
+        }),
+        number: destNextNum,
+      };
+
+      await addDoc(
+        collection(
+          db,
+          "users",
+          uid,
+          "chapters",
+          moveTargetChapter,
+          "assignments",
+          moveTargetAssignment,
+          "questions"
+        ),
+        newQuestionPayload
+      );
+
+      // delete original
+      await deleteDoc(srcRef);
+
+      // re-number remaining in source
+      const qSnap = await getDocs(
+        query(
+          collection(
+            db,
+            "users",
+            uid,
+            "chapters",
+            selectedChapter,
+            "assignments",
+            selectedAssignment,
+            "questions"
+          ),
+          orderBy("number", "asc")
+        )
+      );
+      const docs = qSnap.docs;
+      for (let i = 0; i < docs.length; i++) {
+        const d = docs[i];
+        const correct = i + 1;
+        if (d.data().number !== correct) {
+          await updateDoc(d.ref, { number: correct });
+        }
+      }
+
+      showToast("Question moved");
+
+      // refresh UI
+      await loadAssignments();
+      // if source assignment was being viewed, reload its questions
+      if (selectedAssignment) await loadQuestions();
+
+      // close popup and reset
+      setMoveOpen(false);
+      setMoveTargetAssignment("");
+      setMoveTargetChapter("");
+      setMoveLoading(false);
+    } catch (e) {
+      console.error("move failed", e);
+      showToast("Move failed", "error");
+      setMoveLoading(false);
+    }
+  }
+  // --------------------- End move helpers ---------------------
 
   return (
     <div className="home-grid">
@@ -619,13 +796,6 @@ export default function Home() {
           <div className="form-page">
             <h2>Create Question</h2>
             <form onSubmit={handleCreateQuestion}>
-              {/* <label>Question</label>
-              <textarea
-                id="new-question-title"
-                value={newQuestionText}
-                onChange={(e) => setNewQuestionText(e.target.value)}
-              /> */}
-
               <label style={{ fontWeight: "bold" }}>Note</label>
               <textarea
                 id="new-question-note"
@@ -670,8 +840,143 @@ export default function Home() {
                 >
                   Delete Question
                 </button>
+
+                {/* MOVE BUTTON triggers popup */}
+                <button
+                  className="ghost-btn"
+                  onClick={openMoveUI}
+                  style={{ marginLeft: 8 }}
+                >
+                  Move
+                </button>
               </div>
             </div>
+
+            {/* Move POPUP (modal) */}
+            {moveOpen && (
+              <div
+                className="modal-backdrop"
+                onClick={() => setMoveOpen(false)}
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.45)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1200,
+                }}
+              >
+                <div
+                  className="modal"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    width: 520,
+                    maxWidth: "92%",
+                    background: "#fff",
+                    borderRadius: 8,
+                    padding: 18,
+                    boxShadow: "0 8px 30px rgba(0,0,0,0.2)",
+                  }}
+                >
+                  <h4 style={{ margin: 0, marginBottom: 8 }}>Move Question</h4>
+                  <p style={{ marginTop: 0, color: "#555" }}>
+                    Choose destination chapter and assignment
+                  </p>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      marginTop: 12,
+                      alignItems: "center",
+                    }}
+                  >
+                    <select
+                      value={moveTargetChapter}
+                      onChange={async (e) => {
+                        const chapId = e.target.value;
+                        setMoveTargetChapter(chapId);
+                        setMoveTargetAssignment("");
+                        if (!assignmentsByChapter[chapId]) {
+                          const map = await loadAssignmentsForAllChapters();
+                          if (map[chapId] && map[chapId].length > 0) {
+                            setMoveTargetAssignment(map[chapId][0].id);
+                          }
+                        } else {
+                          if (
+                            assignmentsByChapter[chapId] &&
+                            assignmentsByChapter[chapId].length > 0
+                          ) {
+                            setMoveTargetAssignment(
+                              assignmentsByChapter[chapId][0].id
+                            );
+                          }
+                        }
+                        // let selectedChapData;
+                        // for (const chap in chapters) {
+                        //   if (chap.id === chapId) {
+                        //     selectedChapData = chap
+                        //     break
+                        //   }
+                        // }
+                        // if selectedChapData
+                      }}
+                    >
+                      <option value="">Select chapter</option>
+                      {chapters.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={moveTargetAssignment}
+                      onChange={(e) => setMoveTargetAssignment(e.target.value)}
+                    >
+                      <option value="">Select assignment</option>
+                      {(assignmentsByChapter[moveTargetChapter] || []).map(
+                        (a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        )
+                      )}
+                    </select>
+
+                    <div
+                      style={{ marginLeft: "auto", display: "flex", gap: 8 }}
+                    >
+                      <button
+                        className="primary"
+                        onClick={handleMoveQuestion}
+                        disabled={moveLoading}
+                      >
+                        {moveLoading ? "Moving..." : "Move"}
+                      </button>
+                      <button
+                        className="ghost-btn"
+                        onClick={() => {
+                          setMoveOpen(false);
+                          setMoveTargetAssignment("");
+                          setMoveTargetChapter("");
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* optional note */}
+                  <div style={{ marginTop: 12, color: "#666", fontSize: 13 }}>
+                    The question's note and images will be copied to the
+                    destination and removed from the current assignment. Numbers
+                    in both assignments will be re-ordered.
+                  </div>
+                </div>
+              </div>
+            )}
 
             <PhotoProvider
               key={activeQuestion.id}

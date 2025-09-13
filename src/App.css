@@ -432,6 +432,154 @@ button {
   }
 }
 
+/* ---------------- Move Modal / Popup styles ---------------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  /* top:0; right:0; bottom:0; left:0; */
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  /* above other UI */
+  -webkit-font-smoothing: antialiased;
+  animation: modalFadeIn 180ms ease;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.modal {
+  width: 520px;
+  max-width: 92%;
+  background: var(--light);
+  color: var(--dark);
+  border-radius: 10px;
+  padding: 18px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transform-origin: center;
+  animation: popScale 200ms cubic-bezier(.2, .9, .3, 1);
+}
+
+/* slight pop-in */
+@keyframes popScale {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal h4 {
+  margin: 0 0 6px 0;
+  font-size: 1.05rem;
+  color: var(--primary);
+}
+
+.modal p {
+  margin: 0;
+  color: #5b6470;
+  font-size: 0.95rem;
+}
+
+/* row inside modal: selects + actions */
+.modal .row,
+.modal .controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+/* selects inside modal */
+.modal select {
+  padding: 9px 12px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  background: #fff;
+  min-width: 160px;
+  font-size: 0.95rem;
+  appearance: none;
+  outline: none;
+}
+
+/* make selects more usable on small screens */
+.modal .full-width {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Actions group pushed to the right */
+.modal .actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Slightly stronger primary button inside modal */
+.modal .primary {
+  padding: 9px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+  box-shadow: 0 4px 10px rgba(46, 134, 193, 0.08);
+}
+
+.modal .ghost-btn {
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+/* note text under controls */
+.modal .note {
+  margin-top: 12px;
+  color: #666;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* accessible focus styles */
+.modal select:focus,
+.modal .primary:focus,
+.modal .ghost-btn:focus {
+  box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.12);
+  outline: none;
+}
+
+/* small screens: stack selects and actions */
+@media (max-width: 520px) {
+
+  .modal .row,
+  .modal .controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .modal .actions {
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+
+  .modal select {
+    width: 100%;
+  }
+}
+
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .home-grid {
