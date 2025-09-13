@@ -64,12 +64,17 @@ export default function Home() {
 
   const nav = useNavigate();
 
-  // Move-popup related state
+  // Move-popup related state (add these lines)
   const [moveOpen, setMoveOpen] = useState(false);
   const [moveTargetChapter, setMoveTargetChapter] = useState("");
   const [moveTargetAssignment, setMoveTargetAssignment] = useState("");
   const [moveLoading, setMoveLoading] = useState(false);
   const [assignmentsByChapter, setAssignmentsByChapter] = useState({});
+
+  // Tabs + bulk input
+  const [moveTab, setMoveTab] = useState("move"); // "move" or "bulk"
+  const [bulkNumbersInput, setBulkNumbersInput] = useState(""); // e.g. "4,5,7"
+  const [bulkByNumbersLoading, setBulkByNumbersLoading] = useState(false);
 
   // require login
   useEffect(() => {
@@ -693,6 +698,177 @@ export default function Home() {
       setMoveLoading(false);
     }
   }
+
+  // --------------------- BULK MOVE HELPERS ---------------------
+  function parseNumberList(input) {
+    if (!input || !input.trim()) return [];
+
+    const nums = new Set();
+
+    input.split(",").forEach((part) => {
+      const rangeMatch = part.trim().match(/^(\d+)-(\d+)$/);
+      if (rangeMatch) {
+        const start = Number(rangeMatch[1]);
+        const end = Number(rangeMatch[2]);
+        if (
+          Number.isInteger(start) &&
+          Number.isInteger(end) &&
+          start > 0 &&
+          end >= start
+        ) {
+          for (let n = start; n <= end; n++) {
+            nums.add(n);
+          }
+        }
+      } else {
+        const n = Number(part.trim());
+        if (Number.isInteger(n) && n > 0) {
+          nums.add(n);
+        }
+      }
+    });
+
+    return Array.from(nums).sort((a, b) => a - b);
+  }
+
+  async function handleBulkMoveByNumbers() {
+    // parse input
+    const nums = parseNumberList(bulkNumbersInput);
+    if (!nums.length) {
+      showToast("Enter question numbers (comma separated)", "error");
+      return;
+    }
+    if (!moveTargetChapter || !moveTargetAssignment) {
+      showToast("Select destination chapter & assignment", "error");
+      return;
+    }
+    // prevent same-destination
+    if (
+      moveTargetChapter === selectedChapter &&
+      moveTargetAssignment === selectedAssignment
+    ) {
+      showToast("Destination is same as source", "error");
+      return;
+    }
+
+    setBulkByNumbersLoading(true);
+    try {
+      const uid = auth.currentUser.uid;
+
+      // Map requested numbers -> question objects
+      const matched = nums
+        .map((n) => questions.find((q) => q.number === n))
+        .filter(Boolean); // remove not-found
+
+      const missing = nums.filter((n) => !matched.find((m) => m.number === n));
+      if (missing.length > 0) {
+        showToast(
+          `Question number(s) not found: ${missing.join(", ")}`,
+          "error"
+        );
+        setBulkByNumbersLoading(false);
+        return;
+      }
+
+      // Determine current destination next number
+      const destQSnap = await getDocs(
+        query(
+          collection(
+            db,
+            "users",
+            uid,
+            "chapters",
+            moveTargetChapter,
+            "assignments",
+            moveTargetAssignment,
+            "questions"
+          ),
+          orderBy("number", "asc")
+        )
+      );
+      let destNextNum = destQSnap.size + 1;
+
+      // Add matched questions to destination in ascending order (matched already in ascending by nums)
+      for (const qObj of matched) {
+        const payload = {
+          note: qObj.note ?? "",
+          images: qObj.images ?? [],
+          number: destNextNum,
+        };
+        await addDoc(
+          collection(
+            db,
+            "users",
+            uid,
+            "chapters",
+            moveTargetChapter,
+            "assignments",
+            moveTargetAssignment,
+            "questions"
+          ),
+          payload
+        );
+        destNextNum++;
+      }
+
+      // Delete originals by id (we can safely delete using qObj.id)
+      for (const qObj of matched) {
+        await deleteDoc(
+          doc(
+            db,
+            "users",
+            uid,
+            "chapters",
+            selectedChapter,
+            "assignments",
+            selectedAssignment,
+            "questions",
+            qObj.id
+          )
+        );
+      }
+
+      // Re-number remaining in source
+      const qSnap = await getDocs(
+        query(
+          collection(
+            db,
+            "users",
+            uid,
+            "chapters",
+            selectedChapter,
+            "assignments",
+            selectedAssignment,
+            "questions"
+          ),
+          orderBy("number", "asc")
+        )
+      );
+      for (let i = 0; i < qSnap.docs.length; i++) {
+        const d = qSnap.docs[i];
+        const correct = i + 1;
+        if (d.data().number !== correct) {
+          await updateDoc(d.ref, { number: correct });
+        }
+      }
+
+      showToast(`${matched.length} question(s) moved`);
+      // refresh UI
+      await loadAssignments();
+      await loadQuestions();
+
+      // reset UI
+      setBulkNumbersInput("");
+      setMoveTab("move");
+      setMoveOpen(false);
+    } catch (err) {
+      console.error("bulk move by numbers failed", err);
+      showToast("Bulk move failed", "error");
+    } finally {
+      setBulkByNumbersLoading(false);
+    }
+  }
+
   // --------------------- End move helpers ---------------------
 
   return (
@@ -857,122 +1033,193 @@ export default function Home() {
               <div
                 className="modal-backdrop"
                 onClick={() => setMoveOpen(false)}
-                style={{
-                  position: "fixed",
-                  inset: 0,
-                  background: "rgba(0,0,0,0.45)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  zIndex: 1200,
-                }}
               >
-                <div
-                  className="modal"
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    width: 520,
-                    maxWidth: "92%",
-                    background: "#fff",
-                    borderRadius: 8,
-                    padding: 18,
-                    boxShadow: "0 8px 30px rgba(0,0,0,0.2)",
-                  }}
-                >
-                  <h4 style={{ margin: 0, marginBottom: 8 }}>Move Question</h4>
-                  <p style={{ marginTop: 0, color: "#555" }}>
-                    Choose destination chapter and assignment
-                  </p>
-
+                <div className="modal" onClick={(e) => e.stopPropagation()}>
                   <div
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      marginTop: 12,
-                      alignItems: "center",
-                    }}
+                    style={{ display: "flex", alignItems: "center", gap: 12 }}
                   >
-                    <select
-                      value={moveTargetChapter}
-                      onChange={async (e) => {
-                        const chapId = e.target.value;
-                        setMoveTargetChapter(chapId);
-                        setMoveTargetAssignment("");
-                        if (!assignmentsByChapter[chapId]) {
-                          const map = await loadAssignmentsForAllChapters();
-                          if (map[chapId] && map[chapId].length > 0) {
-                            setMoveTargetAssignment(map[chapId][0].id);
-                          }
-                        } else {
-                          if (
-                            assignmentsByChapter[chapId] &&
-                            assignmentsByChapter[chapId].length > 0
-                          ) {
-                            setMoveTargetAssignment(
-                              assignmentsByChapter[chapId][0].id
-                            );
-                          }
-                        }
-                        // let selectedChapData;
-                        // for (const chap in chapters) {
-                        //   if (chap.id === chapId) {
-                        //     selectedChapData = chap
-                        //     break
-                        //   }
-                        // }
-                        // if selectedChapData
-                      }}
-                    >
-                      <option value="">Select chapter</option>
-                      {chapters.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
+                    <h4 style={{ margin: 0 }}>Move Question</h4>
 
-                    <select
-                      value={moveTargetAssignment}
-                      onChange={(e) => setMoveTargetAssignment(e.target.value)}
-                    >
-                      <option value="">Select assignment</option>
-                      {(assignmentsByChapter[moveTargetChapter] || []).map(
-                        (a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.name}
-                          </option>
-                        )
-                      )}
-                    </select>
-
+                    {/* simple tab buttons */}
                     <div
                       style={{ marginLeft: "auto", display: "flex", gap: 8 }}
                     >
                       <button
-                        className="primary"
-                        onClick={handleMoveQuestion}
-                        disabled={moveLoading}
+                        className={`ghost-btn ${
+                          moveTab === "move" ? "active" : ""
+                        }`}
+                        onClick={() => setMoveTab("move")}
                       >
-                        {moveLoading ? "Moving..." : "Move"}
+                        Move
                       </button>
                       <button
-                        className="ghost-btn"
-                        onClick={() => {
-                          setMoveOpen(false);
-                          setMoveTargetAssignment("");
-                          setMoveTargetChapter("");
-                        }}
+                        className={`ghost-btn ${
+                          moveTab === "bulk" ? "active" : ""
+                        }`}
+                        onClick={() => setMoveTab("bulk")}
                       >
-                        Cancel
+                        Bulk Move
                       </button>
                     </div>
                   </div>
 
-                  {/* optional note */}
+                  <p style={{ marginTop: 6, color: "#555" }}>
+                    {moveTab === "move"
+                      ? "Choose destination chapter and assignment"
+                      : "Enter comma-separated question numbers (e.g. 4,5,7) from the current assignment"}
+                  </p>
+
+                  <div
+                    style={{
+                      marginTop: 12,
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "center",
+                      flexDirection: "column",
+                    }}
+                  >
+                    <div
+                      style={{
+                        marginTop: 12,
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                      }}
+                    >
+                      <select
+                        value={moveTargetChapter}
+                        onChange={async (e) => {
+                          const chapId = e.target.value;
+                          setMoveTargetChapter(chapId);
+                          setMoveTargetAssignment("");
+                          if (!assignmentsByChapter[chapId]) {
+                            const map = await loadAssignmentsForAllChapters();
+                            if (map[chapId] && map[chapId].length > 0) {
+                              setMoveTargetAssignment(map[chapId][0].id);
+                            }
+                          } else {
+                            if (
+                              assignmentsByChapter[chapId] &&
+                              assignmentsByChapter[chapId].length > 0
+                            ) {
+                              setMoveTargetAssignment(
+                                assignmentsByChapter[chapId][0].id
+                              );
+                            }
+                          }
+                        }}
+                      >
+                        <option value="">Select chapter</option>
+                        {chapters.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={moveTargetAssignment}
+                        onChange={(e) =>
+                          setMoveTargetAssignment(e.target.value)
+                        }
+                      >
+                        <option value="">Select assignment</option>
+                        {(assignmentsByChapter[moveTargetChapter] || []).map(
+                          (a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "end",
+                        width: "100%",
+                      }}
+                    >
+                      {/* tab-specific controls */}
+                      {moveTab === "move" ? (
+                        <div
+                          style={{
+                            marginLeft: "auto",
+                            display: "flex",
+                            gap: 8,
+                          }}
+                        >
+                          <button
+                            className="primary"
+                            onClick={handleMoveQuestion}
+                            disabled={moveLoading}
+                          >
+                            {moveLoading ? "Moving..." : "Move"}
+                          </button>
+                          <button
+                            className="ghost-btn"
+                            onClick={() => {
+                              setMoveOpen(false);
+                              setMoveTargetAssignment("");
+                              setMoveTargetChapter("");
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            marginLeft: "auto",
+                            display: "flex",
+                            gap: 8,
+                            alignItems: "center",
+                          }}
+                        >
+                          <input
+                            type="text"
+                            placeholder="e.g. 4,5,7,9"
+                            value={bulkNumbersInput}
+                            onChange={(e) =>
+                              setBulkNumbersInput(e.target.value)
+                            }
+                            style={{
+                              padding: "8px 10px",
+                              borderRadius: 6,
+                              border: "1px solid #ddd",
+                              minWidth: 160,
+                            }}
+                          />
+                          <button
+                            className="primary"
+                            onClick={handleBulkMoveByNumbers}
+                            disabled={bulkByNumbersLoading}
+                          >
+                            {bulkByNumbersLoading ? "Moving..." : "Move"}
+                          </button>
+                          <button
+                            className="ghost-btn"
+                            onClick={() => {
+                              setMoveOpen(false);
+                              setBulkNumbersInput("");
+                              setMoveTargetAssignment("");
+                              setMoveTargetChapter("");
+                              setMoveTab("move");
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <div style={{ marginTop: 12, color: "#666", fontSize: 13 }}>
-                    The question's note and images will be copied to the
-                    destination and removed from the current assignment. Numbers
-                    in both assignments will be re-ordered.
+                    {moveTab === "move"
+                      ? "The question's note and images will be copied to the destination and removed from the current assignment. Numbers in both assignments will be re-ordered."
+                      : "Numbers that don't exist in the current assignment will be reported and prevent the move. Matching questions will be moved in ascending-number order and appended to the destination."}
                   </div>
                 </div>
               </div>
