@@ -76,6 +76,12 @@ export default function Home() {
   const [bulkNumbersInput, setBulkNumbersInput] = useState(""); // e.g. "4,5,7"
   const [bulkByNumbersLoading, setBulkByNumbersLoading] = useState(false);
 
+  // Edit chapter, assignment name
+  const [showEditNamesPopup, setShowEditNamesPopup] = useState(false);
+  const [editTab, setEditTab] = useState("chapter");
+  const [chapterNameEdit, setChapterNameEdit] = useState("");
+  const [assignmentNameEdit, setAssignmentNameEdit] = useState("");
+
   // require login
   useEffect(() => {
     if (!auth.currentUser) {
@@ -706,26 +712,25 @@ export default function Home() {
     const nums = new Set();
 
     input.split(",").forEach((part) => {
-      const rangeMatch = part.trim().match(/^(\d+)-(\d+)$/);
+      const trimmed = part.trim();
+      if (!trimmed) return;
+
+      // match ranges like "5-7" or "5 - 7" (spaces allowed)
+      const rangeMatch = trimmed.match(/^(\d+)\s*-\s*(\d+)$/);
       if (rangeMatch) {
-        const start = Number(rangeMatch[1]);
-        const end = Number(rangeMatch[2]);
-        if (
-          Number.isInteger(start) &&
-          Number.isInteger(end) &&
-          start > 0 &&
-          end >= start
-        ) {
-          for (let n = start; n <= end; n++) {
-            nums.add(n);
-          }
-        }
-      } else {
-        const n = Number(part.trim());
-        if (Number.isInteger(n) && n > 0) {
-          nums.add(n);
-        }
+        let start = Number(rangeMatch[1]);
+        let end = Number(rangeMatch[2]);
+        if (!Number.isInteger(start) || !Number.isInteger(end)) return;
+        if (start <= 0 || end <= 0) return;
+        // swap if reversed (e.g. "7-5")
+        if (end < start) [start, end] = [end, start];
+        for (let n = start; n <= end; n++) nums.add(n);
+        return;
       }
+
+      // single number
+      const n = Number(trimmed);
+      if (Number.isInteger(n) && n > 0) nums.add(n);
     });
 
     return Array.from(nums).sort((a, b) => a - b);
@@ -871,6 +876,33 @@ export default function Home() {
 
   // --------------------- End move helpers ---------------------
 
+  // Edit chapter, assignment name
+  async function handleSaveChapterName() {
+    const uid = auth.currentUser.uid;
+    const dref = doc(db, "users", uid, "chapters", selectedChapter);
+    await updateDoc(dref, { name: chapterNameEdit });
+    showToast("Chapter name updated");
+    setShowEditNamesPopup(false);
+    await loadChaptersForUser(); // refresh chapter names
+  }
+
+  async function handleSaveAssignmentName() {
+    const uid = auth.currentUser.uid;
+    const dref = doc(
+      db,
+      "users",
+      uid,
+      "chapters",
+      selectedChapter,
+      "assignments",
+      selectedAssignment
+    );
+    await updateDoc(dref, { name: assignmentNameEdit });
+    showToast("Assignment name updated");
+    setShowEditNamesPopup(false);
+    await loadAssignments(); // refresh assignment names
+  }
+
   return (
     <div className="home-grid">
       {/* selection bar */}
@@ -915,6 +947,23 @@ export default function Home() {
           >
             Reload
           </button>
+
+          <button
+            className="ghost-btn"
+            onClick={() => {
+              setEditTab("chapter");
+              setChapterNameEdit(
+                chapters.find((c) => c.id === selectedChapter)?.name || ""
+              );
+              setAssignmentNameEdit(
+                assignments.find((a) => a.id === selectedAssignment)?.name || ""
+              );
+              if (selectedChapter) setShowEditNamesPopup(true);
+              else showToast("No chapter selected", "error");
+            }}
+          >
+            Edit Names
+          </button>
           {selectedChapter && (
             <button
               className="ghost-btn"
@@ -933,6 +982,82 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* modal for editing chapter, assignment name */}
+      {showEditNamesPopup && (
+        <div className="popup-overlay">
+          <div className="popup-box">
+            <h2>Edit Names</h2>
+            <div className="tab-buttons">
+              <button
+                className={editTab === "chapter" ? "active-tab" : ""}
+                onClick={() =>
+                  selectedAssignment
+                    ? setEditTab("chapter")
+                    : showToast("No chapter selected", "error")
+                }
+              >
+                Edit Chapter Name
+              </button>
+              <button
+                className={editTab === "assignment" ? "active-tab" : ""}
+                onClick={() =>
+                  selectedAssignment
+                    ? setEditTab("assignment")
+                    : showToast("No assignment selected", "error")
+                }
+              >
+                Edit Assignment Name
+              </button>
+            </div>
+
+            {editTab === "chapter" ? (
+              <div className="edit-form">
+                <label>Chapter Name</label>
+                <input
+                  type="text"
+                  value={chapterNameEdit}
+                  onChange={(e) => setChapterNameEdit(e.target.value)}
+                />
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button onClick={handleSaveChapterName} className="ghost-btn">
+                    Save Chapter Name
+                  </button>
+                  <button
+                    className="ghost-btn"
+                    onClick={() => setShowEditNamesPopup(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="edit-form">
+                <label>Assignment Name</label>
+                <input
+                  type="text"
+                  value={assignmentNameEdit}
+                  onChange={(e) => setAssignmentNameEdit(e.target.value)}
+                />
+                <div>
+                  <button
+                    className="ghost-btn"
+                    onClick={handleSaveAssignmentName}
+                  >
+                    Save Assignment Name
+                  </button>
+                  <button
+                    className="ghost-btn"
+                    onClick={() => setShowEditNamesPopup(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* left panel */}
       <aside className="left-panel">
@@ -1066,7 +1191,7 @@ export default function Home() {
                   <p style={{ marginTop: 6, color: "#555" }}>
                     {moveTab === "move"
                       ? "Choose destination chapter and assignment"
-                      : "Enter comma-separated question numbers (e.g. 4,5,7) from the current assignment"}
+                      : "Enter comma-separated question numbers from the current assignment"}
                   </p>
 
                   <div
@@ -1180,7 +1305,7 @@ export default function Home() {
                         >
                           <input
                             type="text"
-                            placeholder="e.g. 4,5,7,9"
+                            placeholder="(e.g. 19, 12, 7, 2-5, 3 - 9)"
                             value={bulkNumbersInput}
                             onChange={(e) =>
                               setBulkNumbersInput(e.target.value)
