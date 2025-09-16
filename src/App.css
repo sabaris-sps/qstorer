@@ -243,6 +243,7 @@ body {
   padding: 8px 15px;
   border-radius: 4px;
   text-decoration: none;
+  margin-right: 100px;
 }
 
 .note-section {
@@ -375,6 +376,11 @@ button {
   text-decoration: none;
 }
 
+.ghost-btn:disabled {
+  border: 1px solid var(--gray);
+  color: var(--gray)
+}
+
 .ghost-btn:hover {
   background-color: rgba(52, 152, 219, 0.1);
 }
@@ -412,9 +418,9 @@ button {
 
 /* Photo View Image */
 .thumbnail {
-  aspect-ratio: 1 / 1;
-  max-width: 200px;
-  object-fit: cover;
+  width: 100%;
+  max-height: 550px;
+  object-fit: contain;
   object-position: center;
   cursor: pointer;
   border: 1px solid #ccc;
@@ -431,6 +437,13 @@ button {
     transform: translateY(0);
   }
 }
+
+.photo-nav-helper {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
 
 /* ---------------- Move Modal / Popup styles ---------------- */
 .modal-backdrop {
@@ -632,6 +645,9 @@ button {
   border-radius: 4px;
 }
 
+.invisible {
+  display: none;
+}
 
 /* Responsive adjustments */
 @media (max-width: 768px) {

@@ -903,6 +903,44 @@ export default function Home() {
     await loadAssignments(); // refresh assignment names
   }
 
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (!e.altKey && e.key === "ArrowRight") {
+        e.preventDefault();
+        const currentIndex = questions.findIndex(
+          (q) => q.id === activeQuestionId
+        );
+        if (currentIndex !== -1 && currentIndex < questions.length - 1) {
+          const nextQ = questions[currentIndex + 1];
+          handleSelectQuestion(nextQ.id);
+        }
+      } else if (!e.altKey && e.key === "ArrowLeft") {
+        e.preventDefault();
+        const currentIndex = questions.findIndex(
+          (q) => q.id === activeQuestionId
+        );
+        if (currentIndex > 0) {
+          const prevQ = questions[currentIndex - 1];
+          handleSelectQuestion(prevQ.id);
+        }
+      }
+      if (activeQuestion?.images?.length > 0) {
+        if (e.altKey && e.key === "ArrowRight") {
+          e.preventDefault();
+          setPhotoIndex((prev) =>
+            Math.min(prev + 1, activeQuestion.images.length - 1)
+          );
+        } else if (e.altKey && e.key === "ArrowLeft") {
+          e.preventDefault();
+          setPhotoIndex((prev) => Math.max(prev - 1, 0));
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [photoViewerVisible, activeQuestion, activeQuestionId, questions]);
+
   return (
     <div className="home-grid">
       {/* selection bar */}
@@ -1349,9 +1387,33 @@ export default function Home() {
                 </div>
               </div>
             )}
-
+            {activeQuestion?.images?.length > 0 && (
+              <div className="photo-nav-helper">
+                <button
+                  className="ghost-btn"
+                  disabled={photoIndex === 0}
+                  onClick={() => setPhotoIndex((prev) => prev - 1)}
+                >
+                  Previous Image
+                </button>
+                <h4>
+                  Showing {photoIndex + 1}/{activeQuestion.images?.length || 0}
+                </h4>
+                <button
+                  className="ghost-btn"
+                  disabled={
+                    photoIndex + 1 === (activeQuestion.images?.length || 0)
+                  }
+                  onClick={() => setPhotoIndex((prev) => prev + 1)}
+                >
+                  Next Image
+                </button>
+              </div>
+            )}
             <PhotoProvider
               key={activeQuestion.id}
+              pullClosable={false}
+              maskClosable={false}
               index={photoIndex}
               visible={photoViewerVisible}
               onVisibleChange={setPhotoViewerVisible}
@@ -1372,7 +1434,13 @@ export default function Home() {
               <div className="foo">
                 {(activeQuestion.images || []).map((img_url, index) => (
                   <PhotoView key={index} src={img_url}>
-                    <img src={img_url} alt="" className="thumbnail" />
+                    <img
+                      src={img_url}
+                      alt=""
+                      className={`thumbnail ${
+                        index === photoIndex ? "fill" : "invisible"
+                      }`}
+                    />
                   </PhotoView>
                 ))}
               </div>
