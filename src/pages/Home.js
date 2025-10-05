@@ -18,8 +18,12 @@ import { v4 as uuidv4 } from "uuid";
 import { auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import "react-photo-view/dist/react-photo-view.css";
-import { PhotoProvider, PhotoView } from "react-photo-view";
-import { FileUploader } from "react-drag-drop-files";
+import Sidebar from "../components/Sidebar";
+import EditNamesModal from "../components/EditNamesModal";
+import CreateQuestion from "../components/CreateQuestion";
+import QuestionCard from "../components/QuestionCard";
+import SelectionBar from "../components/SelectionBar";
+import { sanitizePublicId } from "../utils";
 
 /* Toast component */
 function Toast({ toast }) {
@@ -232,7 +236,7 @@ export default function Home() {
       const uploaded = [];
       for (const f of newFiles) {
         const name = `${chapName}-${asgName}-${nextNum}-${Date.now()}`;
-        const url = await uploadToCloudinary(f, name);
+        const url = await uploadToCloudinary(f, sanitizePublicId(name));
         uploaded.push(url);
       }
 
@@ -326,7 +330,7 @@ export default function Home() {
       const urls = [];
       for (const f of moreFiles) {
         const name = `${chapName}-${asgName}-${qNum}-${Date.now()}`;
-        const url = await uploadToCloudinary(f, name);
+        const url = await uploadToCloudinary(f, sanitizePublicId(name));
         urls.push(url);
       }
 
@@ -566,17 +570,6 @@ export default function Home() {
       showToast("Failed to load assignments", "error");
       return {};
     }
-  }
-
-  function openMoveUI() {
-    if (!activeQuestion) {
-      showToast("Select a question first", "error");
-      return;
-    }
-    setMoveOpen(true);
-    setMoveTargetChapter(selectedChapter || "");
-    setMoveTargetAssignment(selectedAssignment || "");
-    loadAssignmentsForAllChapters();
   }
 
   async function handleMoveQuestion() {
@@ -943,186 +936,52 @@ export default function Home() {
 
   return (
     <div className="home-grid">
-      {/* selection bar */}
-      <div className="selection-bar">
-        <div className="sel-item">
-          <label>Chapter</label>
-          <select
-            value={selectedChapter || ""}
-            onChange={(e) => setSelectedChapter(e.target.value)}
-          >
-            <option value="">Select Chapter</option>
-            {chapters.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="sel-item">
-          <label>Assignment</label>
-          <select
-            value={selectedAssignment || ""}
-            onChange={(e) => setSelectedAssignment(e.target.value)}
-          >
-            <option value="">Select Assignment</option>
-            {assignments.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="sel-actions">
-          <button
-            className="ghost-btn"
-            onClick={() => {
-              if (user) loadChaptersForUser();
-              handleSelectQuestion(activeQuestionId);
-            }}
-          >
-            Reload
-          </button>
-
-          <button
-            className="ghost-btn"
-            onClick={() => {
-              setEditTab("chapter");
-              setChapterNameEdit(
-                chapters.find((c) => c.id === selectedChapter)?.name || ""
-              );
-              setAssignmentNameEdit(
-                assignments.find((a) => a.id === selectedAssignment)?.name || ""
-              );
-              if (selectedChapter) setShowEditNamesPopup(true);
-              else showToast("No chapter selected", "error");
-            }}
-          >
-            Edit Names
-          </button>
-          {selectedChapter && (
-            <button
-              className="ghost-btn"
-              onClick={() => handleDeleteChapter(selectedChapter)}
-            >
-              Delete Chapter
-            </button>
-          )}
-          {selectedAssignment && (
-            <button
-              className="ghost-btn"
-              onClick={() => handleDeleteAssignment(selectedAssignment)}
-            >
-              Delete Assignment
-            </button>
-          )}
-        </div>
-      </div>
+      <SelectionBar
+        selectedChapter={selectedChapter}
+        setSelectedChapter={setSelectedChapter}
+        setSelectedAssignment={setSelectedAssignment}
+        selectedAssignment={selectedAssignment}
+        assignments={assignments}
+        chapters={chapters}
+        loadChaptersForUser={loadChaptersForUser}
+        setEditTab={setEditTab}
+        user={user}
+        handleSelectQuestion={handleSelectQuestion}
+        setChapterNameEdit={setChapterNameEdit}
+        setAssignmentNameEdit={setAssignmentNameEdit}
+        activeQuestionId={activeQuestionId}
+        setShowEditNamesPopup={setShowEditNamesPopup}
+        showToast={showToast}
+        handleDeleteAssignment={handleDeleteAssignment}
+        handleDeleteChapter={handleDeleteChapter}
+      />
 
       {/* modal for editing chapter, assignment name */}
       {showEditNamesPopup && (
-        <div className="popup-overlay">
-          <div className="popup-box">
-            <h2>Edit Names</h2>
-            <div className="tab-buttons">
-              <button
-                className={editTab === "chapter" ? "active-tab" : ""}
-                onClick={() =>
-                  selectedAssignment
-                    ? setEditTab("chapter")
-                    : showToast("No chapter selected", "error")
-                }
-              >
-                Edit Chapter Name
-              </button>
-              <button
-                className={editTab === "assignment" ? "active-tab" : ""}
-                onClick={() =>
-                  selectedAssignment
-                    ? setEditTab("assignment")
-                    : showToast("No assignment selected", "error")
-                }
-              >
-                Edit Assignment Name
-              </button>
-            </div>
-
-            {editTab === "chapter" ? (
-              <div className="edit-form">
-                <label>Chapter Name</label>
-                <input
-                  type="text"
-                  value={chapterNameEdit}
-                  onChange={(e) => setChapterNameEdit(e.target.value)}
-                />
-                <div style={{ display: "flex", gap: "10px" }}>
-                  <button onClick={handleSaveChapterName} className="ghost-btn">
-                    Save Chapter Name
-                  </button>
-                  <button
-                    className="ghost-btn"
-                    onClick={() => setShowEditNamesPopup(false)}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="edit-form">
-                <label>Assignment Name</label>
-                <input
-                  type="text"
-                  value={assignmentNameEdit}
-                  onChange={(e) => setAssignmentNameEdit(e.target.value)}
-                />
-                <div>
-                  <button
-                    className="ghost-btn"
-                    onClick={handleSaveAssignmentName}
-                  >
-                    Save Assignment Name
-                  </button>
-                  <button
-                    className="ghost-btn"
-                    onClick={() => setShowEditNamesPopup(false)}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <EditNamesModal
+          editTab={editTab}
+          selectedAssignment={selectedAssignment}
+          setEditTab={setEditTab}
+          showToast={showToast}
+          chapterNameEdit={chapterNameEdit}
+          setChapterNameEdit={setChapterNameEdit}
+          handleSaveChapterName={handleSaveChapterName}
+          handleSaveAssignmentName={handleSaveAssignmentName}
+          setShowEditNamesPopup={setShowEditNamesPopup}
+          assignmentNameEdit={assignmentNameEdit}
+          setAssignmentNameEdit={setAssignmentNameEdit}
+        />
       )}
 
-      {/* left panel */}
-      <aside className="left-panel">
-        <div className="qp-header">Questions</div>
-        <div className="q-grid">
-          {questions.map((q) => (
-            <button
-              key={q.id}
-              className={`num-btn ${q.id === activeQuestionId ? "active" : ""}`}
-              onClick={() => handleSelectQuestion(q.id)}
-            >
-              {q.number}
-            </button>
-          ))}
-          {selectedChapter && selectedAssignment && (
-            <button
-              className="num-btn plus"
-              onClick={() => {
-                setActiveQuestionId(null);
-                setMode("create");
-              }}
-            >
-              +
-            </button>
-          )}
-        </div>
-      </aside>
+      <Sidebar
+        questions={questions}
+        activeQuestionId={activeQuestionId}
+        setActiveQuestionId={setActiveQuestionId}
+        handleSelectQuestion={handleSelectQuestion}
+        selectedChapter={selectedChapter}
+        selectedAssignment={selectedAssignment}
+        setMode={setMode}
+      />
 
       {/* main panel */}
       <section className="main-panel">
@@ -1132,374 +991,54 @@ export default function Home() {
             from top links.
           </div>
         ) : mode === "create" ? (
-          <div className="form-page">
-            <h2>Create Question</h2>
-            <form onSubmit={handleCreateQuestion}>
-              <label style={{ fontWeight: "bold" }}>Note</label>
-              <textarea
-                id="new-question-note"
-                value={newNoteText}
-                onChange={(e) => setNewNoteText(e.target.value)}
-              />
-
-              <FileUploader
-                handleChange={(files) => setNewFiles([...files])}
-                name="new-question-files"
-                types={["JPG", "PNG", "GIF", "JPEG"]}
-                maxSize={10}
-                multiple
-              />
-
-              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-                <button className="primary" type="submit">
-                  Add Question
-                </button>
-                <button
-                  type="button"
-                  className="ghost-btn"
-                  onClick={() => setMode("view")}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
+          <CreateQuestion
+            handleCreateQuestion={handleCreateQuestion}
+            newNoteText={newNoteText}
+            setNewNoteText={setNewNoteText}
+            setNewFiles={setNewFiles}
+            setMode={setMode}
+          />
         ) : questions.length === 0 ? (
           <div className="placeholder">
             No questions yet. Click + to add one.
           </div>
         ) : activeQuestion ? (
-          <div className="question-card">
-            <div className="qhead">
-              <h3>Question {activeQuestion.number}</h3>
-              <div>
-                <button
-                  className="ghost-btn"
-                  onClick={() => handleDeleteQuestion(activeQuestion.id)}
-                >
-                  Delete Question
-                </button>
-
-                {/* MOVE BUTTON triggers popup */}
-                <button
-                  className="ghost-btn"
-                  onClick={openMoveUI}
-                  style={{ marginLeft: 8 }}
-                >
-                  Move
-                </button>
-              </div>
-            </div>
-
-            {/* Move POPUP (modal) */}
-            {moveOpen && (
-              <div
-                className="modal-backdrop"
-                onClick={() => setMoveOpen(false)}
-              >
-                <div className="modal" onClick={(e) => e.stopPropagation()}>
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 12 }}
-                  >
-                    <h4 style={{ margin: 0 }}>Move Question</h4>
-
-                    {/* simple tab buttons */}
-                    <div
-                      style={{ marginLeft: "auto", display: "flex", gap: 8 }}
-                    >
-                      <button
-                        className={`ghost-btn ${
-                          moveTab === "move" ? "active" : ""
-                        }`}
-                        onClick={() => setMoveTab("move")}
-                      >
-                        Move
-                      </button>
-                      <button
-                        className={`ghost-btn ${
-                          moveTab === "bulk" ? "active" : ""
-                        }`}
-                        onClick={() => setMoveTab("bulk")}
-                      >
-                        Bulk Move
-                      </button>
-                    </div>
-                  </div>
-
-                  <p style={{ marginTop: 6, color: "#555" }}>
-                    {moveTab === "move"
-                      ? "Choose destination chapter and assignment"
-                      : "Enter comma-separated question numbers from the current assignment"}
-                  </p>
-
-                  <div
-                    style={{
-                      marginTop: 12,
-                      display: "flex",
-                      gap: 8,
-                      alignItems: "center",
-                      flexDirection: "column",
-                    }}
-                  >
-                    <div
-                      style={{
-                        marginTop: 12,
-                        display: "flex",
-                        gap: 8,
-                        alignItems: "center",
-                      }}
-                    >
-                      <select
-                        value={moveTargetChapter}
-                        onChange={async (e) => {
-                          const chapId = e.target.value;
-                          setMoveTargetChapter(chapId);
-                          setMoveTargetAssignment("");
-                          if (!assignmentsByChapter[chapId]) {
-                            const map = await loadAssignmentsForAllChapters();
-                            if (map[chapId] && map[chapId].length > 0) {
-                              setMoveTargetAssignment(map[chapId][0].id);
-                            }
-                          } else {
-                            if (
-                              assignmentsByChapter[chapId] &&
-                              assignmentsByChapter[chapId].length > 0
-                            ) {
-                              setMoveTargetAssignment(
-                                assignmentsByChapter[chapId][0].id
-                              );
-                            }
-                          }
-                        }}
-                      >
-                        <option value="">Select chapter</option>
-                        {chapters.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-
-                      <select
-                        value={moveTargetAssignment}
-                        onChange={(e) =>
-                          setMoveTargetAssignment(e.target.value)
-                        }
-                      >
-                        <option value="">Select assignment</option>
-                        {(assignmentsByChapter[moveTargetChapter] || []).map(
-                          (a) => (
-                            <option key={a.id} value={a.id}>
-                              {a.name}
-                            </option>
-                          )
-                        )}
-                      </select>
-                    </div>
-
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 8,
-                        alignItems: "end",
-                        width: "100%",
-                      }}
-                    >
-                      {/* tab-specific controls */}
-                      {moveTab === "move" ? (
-                        <div
-                          style={{
-                            marginLeft: "auto",
-                            display: "flex",
-                            gap: 8,
-                          }}
-                        >
-                          <button
-                            className="primary"
-                            onClick={handleMoveQuestion}
-                            disabled={moveLoading}
-                          >
-                            {moveLoading ? "Moving..." : "Move"}
-                          </button>
-                          <button
-                            className="ghost-btn"
-                            onClick={() => {
-                              setMoveOpen(false);
-                              setMoveTargetAssignment("");
-                              setMoveTargetChapter("");
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            marginLeft: "auto",
-                            display: "flex",
-                            gap: 8,
-                            alignItems: "center",
-                          }}
-                        >
-                          <input
-                            type="text"
-                            placeholder="(e.g. 19, 12, 7, 2-5, 3 - 9)"
-                            value={bulkNumbersInput}
-                            onChange={(e) =>
-                              setBulkNumbersInput(e.target.value)
-                            }
-                            style={{
-                              padding: "8px 10px",
-                              borderRadius: 6,
-                              border: "1px solid #ddd",
-                              minWidth: 160,
-                            }}
-                          />
-                          <button
-                            className="primary"
-                            onClick={handleBulkMoveByNumbers}
-                            disabled={bulkByNumbersLoading}
-                          >
-                            {bulkByNumbersLoading ? "Moving..." : "Move"}
-                          </button>
-                          <button
-                            className="ghost-btn"
-                            onClick={() => {
-                              setMoveOpen(false);
-                              setBulkNumbersInput("");
-                              setMoveTargetAssignment("");
-                              setMoveTargetChapter("");
-                              setMoveTab("move");
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: 12, color: "#666", fontSize: 13 }}>
-                    {moveTab === "move"
-                      ? "The question's note and images will be copied to the destination and removed from the current assignment. Numbers in both assignments will be re-ordered."
-                      : "Numbers that don't exist in the current assignment will be reported and prevent the move. Matching questions will be moved in ascending-number order and appended to the destination."}
-                  </div>
-                </div>
-              </div>
-            )}
-            {activeQuestion?.images?.length > 0 && (
-              <div className="photo-nav-helper">
-                <button
-                  className="ghost-btn"
-                  disabled={photoIndex === 0}
-                  onClick={() => setPhotoIndex((prev) => prev - 1)}
-                >
-                  Previous Image
-                </button>
-                <h4>
-                  Showing {photoIndex + 1}/{activeQuestion.images?.length || 0}
-                </h4>
-                <button
-                  className="ghost-btn"
-                  disabled={
-                    photoIndex + 1 === (activeQuestion.images?.length || 0)
-                  }
-                  onClick={() => setPhotoIndex((prev) => prev + 1)}
-                >
-                  Next Image
-                </button>
-              </div>
-            )}
-            <PhotoProvider
-              key={activeQuestion.id}
-              pullClosable={false}
-              maskClosable={false}
-              index={photoIndex}
-              visible={photoViewerVisible}
-              onVisibleChange={setPhotoViewerVisible}
-              onIndexChange={setPhotoIndex}
-              toolbarRender={() => {
-                return (
-                  <>
-                    <button
-                      className="delete-img-btn"
-                      onClick={handleDeleteImage}
-                    >
-                      Delete
-                    </button>
-                  </>
-                );
-              }}
-            >
-              <div className="foo">
-                {(activeQuestion.images || []).map((img_url, index) => (
-                  <PhotoView key={index} src={img_url}>
-                    <img
-                      src={img_url}
-                      alt=""
-                      className={`thumbnail ${
-                        index === photoIndex ? "fill" : "invisible"
-                      }`}
-                    />
-                  </PhotoView>
-                ))}
-              </div>
-            </PhotoProvider>
-
-            <div className="note-section">
-              <label>Note</label>
-              <textarea
-                value={noteEdit}
-                onChange={(e) => setNoteEdit(e.target.value)}
-              />
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                {saveNoteBtn ? (
-                  <button className="primary" onClick={handleSaveNote}>
-                    Save Note
-                  </button>
-                ) : (
-                  <button
-                    className="primary"
-                    style={{ cursor: "no-drop" }}
-                    disabled
-                  >
-                    Loading...
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="upload-more">
-              <label style={{ fontWeight: "bold" }}>Upload More Images</label>
-
-              <FileUploader
-                handleChange={(files) => setMoreFiles([...files])}
-                name="more-files"
-                types={["JPG", "PNG", "GIF", "JPEG"]}
-                maxSize={10}
-                multiple
-              />
-
-              <div style={{ marginTop: 8 }}>
-                {uploadImagesBtn ? (
-                  <button
-                    className="ghost-btn small"
-                    onClick={handleUploadMoreImages}
-                  >
-                    Upload & Append
-                  </button>
-                ) : (
-                  <button
-                    className="ghost-btn small"
-                    style={{ cursor: "no-drop" }}
-                    disabled
-                  >
-                    Loading...
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+          <QuestionCard
+            activeQuestion={activeQuestion}
+            handleDeleteQuestion={handleDeleteQuestion}
+            moveOpen={moveOpen}
+            setMoveOpen={setMoveOpen}
+            moveTab={moveTab}
+            setMoveTab={setMoveTab}
+            moveTargetChapter={moveTargetChapter}
+            setMoveTargetChapter={setMoveTargetChapter}
+            setMoveTargetAssignment={setMoveTargetAssignment}
+            assignmentsByChapter={assignmentsByChapter}
+            loadAssignmentsForAllChapters={loadAssignmentsForAllChapters}
+            chapters={chapters}
+            moveTargetAssignment={moveTargetAssignment}
+            handleMoveQuestion={handleMoveQuestion}
+            moveLoading={moveLoading}
+            bulkNumbersInput={bulkNumbersInput}
+            handleBulkMoveByNumbers={handleBulkMoveByNumbers}
+            setBulkNumbersInput={setBulkNumbersInput}
+            bulkByNumbersLoading={bulkByNumbersLoading}
+            photoIndex={photoIndex}
+            setPhotoIndex={setPhotoIndex}
+            photoViewerVisible={photoViewerVisible}
+            setPhotoViewerVisible={setPhotoViewerVisible}
+            handleDeleteImage={handleDeleteImage}
+            noteEdit={noteEdit}
+            setNoteEdit={setNoteEdit}
+            saveNoteBtn={saveNoteBtn}
+            setMoreFiles={setMoreFiles}
+            handleUploadMoreImages={handleUploadMoreImages}
+            uploadImagesBtn={uploadImagesBtn}
+            handleSaveNote={handleSaveNote}
+            showToast={showToast}
+            selectedChapter={selectedChapter}
+            selectedAssignment={selectedAssignment}
+          />
         ) : (
           <div className="placeholder">Select a question number</div>
         )}
