@@ -27,12 +27,12 @@ export default function CreateQuestion({
         />
 
         <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <button className="primary" type="submit">
+          <button className="btn-primary" type="submit">
             Add Question
           </button>
           <button
             type="button"
-            className="ghost-btn"
+            className="btn-outline-secondary" // Secondary outline for Cancel
             onClick={() => setMode("view")}
           >
             Cancel

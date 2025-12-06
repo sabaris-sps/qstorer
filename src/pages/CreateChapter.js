@@ -28,7 +28,9 @@ export default function CreateChapter() {
         placeholder="Chapter name"
       />
       <div style={{ marginTop: 10 }}>
-        <button className="primary" onClick={handleCreate}>
+        <button className="btn-primary" onClick={handleCreate}>
+          {" "}
+          {/* Main Action */}
           Create Chapter
         </button>
       </div>

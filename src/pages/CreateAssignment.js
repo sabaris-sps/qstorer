@@ -41,7 +41,9 @@ export default function CreateAssignment() {
         placeholder="Assignment name"
       />
       <div style={{ marginTop: 10 }}>
-        <button className="primary" onClick={handleCreate}>
+        <button className="btn-primary" onClick={handleCreate}>
+          {" "}
+          {/* Main Action */}
           Create Assignment
         </button>
       </div>

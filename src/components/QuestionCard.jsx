@@ -53,7 +53,7 @@ export default function QuestionCard({
         <h3>Question {activeQuestion.number}</h3>
         <div>
           <button
-            className="ghost-btn"
+            className="btn-danger btn-sm"
             onClick={() => handleDeleteQuestion(activeQuestion.id)}
           >
             Delete Question
@@ -61,7 +61,7 @@ export default function QuestionCard({
 
           {/* MOVE BUTTON triggers popup */}
           <button
-            className="ghost-btn"
+            className="btn-outline-primary btn-sm"
             onClick={openMoveUI}
             style={{ marginLeft: 8 }}
           >
@@ -80,13 +80,17 @@ export default function QuestionCard({
               {/* simple tab buttons */}
               <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
                 <button
-                  className={`ghost-btn ${moveTab === "move" ? "active" : ""}`}
+                  className={`btn-outline-primary btn-sm ${
+                    moveTab === "move" ? "active" : ""
+                  }`}
                   onClick={() => setMoveTab("move")}
                 >
                   Move
                 </button>
                 <button
-                  className={`ghost-btn ${moveTab === "bulk" ? "active" : ""}`}
+                  className={`btn-outline-primary btn-sm ${
+                    moveTab === "bulk" ? "active" : ""
+                  }`}
                   onClick={() => setMoveTab("bulk")}
                 >
                   Bulk Move
@@ -179,14 +183,14 @@ export default function QuestionCard({
                     }}
                   >
                     <button
-                      className="primary"
+                      className="btn-primary" // Main action
                       onClick={handleMoveQuestion}
                       disabled={moveLoading}
                     >
                       {moveLoading ? "Moving..." : "Move"}
                     </button>
                     <button
-                      className="ghost-btn"
+                      className="btn-outline-secondary"
                       onClick={() => {
                         setMoveOpen(false);
                         setMoveTargetAssignment("");
@@ -218,14 +222,14 @@ export default function QuestionCard({
                       }}
                     />
                     <button
-                      className="primary"
+                      className="btn-primary"
                       onClick={handleBulkMoveByNumbers}
                       disabled={bulkByNumbersLoading}
                     >
                       {bulkByNumbersLoading ? "Moving..." : "Move"}
                     </button>
                     <button
-                      className="ghost-btn"
+                      className="btn-outline-secondary"
                       onClick={() => {
                         setMoveOpen(false);
                         setBulkNumbersInput("");
@@ -258,9 +262,9 @@ export default function QuestionCard({
           >
             Previous Image
           </button>
-          <h4>
+          <h5>
             Showing {photoIndex + 1}/{activeQuestion.images?.length || 0}
-          </h4>
+          </h5>
           <button
             className="ghost-btn"
             disabled={photoIndex + 1 === (activeQuestion.images?.length || 0)}
@@ -281,7 +285,7 @@ export default function QuestionCard({
         toolbarRender={() => {
           return (
             <>
-              <button className="delete-img-btn" onClick={handleDeleteImage}>
+              <button className="btn-danger" onClick={handleDeleteImage}>
                 Delete
               </button>
             </>
@@ -311,11 +315,17 @@ export default function QuestionCard({
         />
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           {saveNoteBtn ? (
-            <button className="primary" onClick={handleSaveNote}>
+            <button className="btn-success" onClick={handleSaveNote}>
+              {" "}
+              {/* Use SUCCESS for saving */}
               Save Note
             </button>
           ) : (
-            <button className="primary" style={{ cursor: "no-drop" }} disabled>
+            <button
+              className="btn-primary"
+              style={{ cursor: "no-drop" }}
+              disabled
+            >
               Loading...
             </button>
           )}
@@ -323,7 +333,7 @@ export default function QuestionCard({
       </div>
 
       <div className="upload-more">
-        <label style={{ fontWeight: "bold" }}>Upload More Images</label>
+        <label>Upload More Images</label>
 
         <FileUploader
           handleChange={(files) => setMoreFiles([...files])}
@@ -336,14 +346,14 @@ export default function QuestionCard({
         <div style={{ marginTop: 8 }}>
           {uploadImagesBtn ? (
             <button
-              className="ghost-btn small"
+              className="btn-primary btn-sm"
               onClick={handleUploadMoreImages}
             >
               Upload & Append
             </button>
           ) : (
             <button
-              className="ghost-btn small"
+              className="btn-primary btn-sm"
               style={{ cursor: "no-drop" }}
               disabled
             >

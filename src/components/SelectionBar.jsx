@@ -21,7 +21,7 @@ export default function SelectionBar({
     <>
       <div className="selection-bar">
         <div className="sel-item">
-          <label>Chapter</label>
+          <label>Chap</label>
           <select
             value={selectedChapter || ""}
             onChange={(e) => setSelectedChapter(e.target.value)}
@@ -36,7 +36,7 @@ export default function SelectionBar({
         </div>
 
         <div className="sel-item">
-          <label>Assignment</label>
+          <label>Asgn</label>
           <select
             value={selectedAssignment || ""}
             onChange={(e) => setSelectedAssignment(e.target.value)}
@@ -52,7 +52,7 @@ export default function SelectionBar({
 
         <div className="sel-actions">
           <button
-            className="ghost-btn"
+            className="btn-outline-secondary btn-sm"
             onClick={() => {
               if (user) loadChaptersForUser();
               handleSelectQuestion(activeQuestionId);
@@ -62,7 +62,7 @@ export default function SelectionBar({
           </button>
 
           <button
-            className="ghost-btn"
+            className="btn-outline-secondary btn-sm"
             onClick={() => {
               setEditTab("chapter");
               setChapterNameEdit(
@@ -79,18 +79,18 @@ export default function SelectionBar({
           </button>
           {selectedChapter && (
             <button
-              className="ghost-btn"
+              className="btn-danger btn-sm"
               onClick={() => handleDeleteChapter(selectedChapter)}
             >
-              Delete Chapter
+              Del Chap
             </button>
           )}
           {selectedAssignment && (
             <button
-              className="ghost-btn"
+              className="btn-danger btn-sm"
               onClick={() => handleDeleteAssignment(selectedAssignment)}
             >
-              Delete Assignment
+              Del Asgn
             </button>
           )}
         </div>

@@ -932,30 +932,11 @@ export default function Home() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+    //eslint-disable-next-line
   }, [photoViewerVisible, activeQuestion, activeQuestionId, questions]);
 
   return (
     <div className="home-grid">
-      <SelectionBar
-        selectedChapter={selectedChapter}
-        setSelectedChapter={setSelectedChapter}
-        setSelectedAssignment={setSelectedAssignment}
-        selectedAssignment={selectedAssignment}
-        assignments={assignments}
-        chapters={chapters}
-        loadChaptersForUser={loadChaptersForUser}
-        setEditTab={setEditTab}
-        user={user}
-        handleSelectQuestion={handleSelectQuestion}
-        setChapterNameEdit={setChapterNameEdit}
-        setAssignmentNameEdit={setAssignmentNameEdit}
-        activeQuestionId={activeQuestionId}
-        setShowEditNamesPopup={setShowEditNamesPopup}
-        showToast={showToast}
-        handleDeleteAssignment={handleDeleteAssignment}
-        handleDeleteChapter={handleDeleteChapter}
-      />
-
       {/* modal for editing chapter, assignment name */}
       {showEditNamesPopup && (
         <EditNamesModal
@@ -985,6 +966,26 @@ export default function Home() {
 
       {/* main panel */}
       <section className="main-panel">
+        <SelectionBar
+          selectedChapter={selectedChapter}
+          setSelectedChapter={setSelectedChapter}
+          setSelectedAssignment={setSelectedAssignment}
+          selectedAssignment={selectedAssignment}
+          assignments={assignments}
+          chapters={chapters}
+          loadChaptersForUser={loadChaptersForUser}
+          setEditTab={setEditTab}
+          user={user}
+          handleSelectQuestion={handleSelectQuestion}
+          setChapterNameEdit={setChapterNameEdit}
+          setAssignmentNameEdit={setAssignmentNameEdit}
+          activeQuestionId={activeQuestionId}
+          setShowEditNamesPopup={setShowEditNamesPopup}
+          showToast={showToast}
+          handleDeleteAssignment={handleDeleteAssignment}
+          handleDeleteChapter={handleDeleteChapter}
+        />
+
         {!selectedChapter || !selectedAssignment ? (
           <div className="placeholder">
             Select a chapter & assignment to begin. Create chapters/assignments
