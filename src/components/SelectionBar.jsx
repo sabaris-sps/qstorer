@@ -1,3 +1,5 @@
+import { exportQuestionsToPDF } from "../utils";
+
 export default function SelectionBar({
   selectedChapter,
   setSelectedChapter,
@@ -16,7 +18,22 @@ export default function SelectionBar({
   showToast,
   handleDeleteAssignment,
   handleDeleteChapter,
+  questions,
 }) {
+  const handleExport = async () => {
+    if (questions && questions.length > 0) {
+      try {
+        await exportQuestionsToPDF(questions);
+      } catch (error) {
+        console.error("PDF Export failed:", error);
+        // Optionally show a toast error here
+      } finally {
+      }
+    } else {
+      // ... (Handle no questions case, maybe with showToast)
+    }
+  };
+
   return (
     <>
       <div className="selection-bar">
@@ -59,6 +76,13 @@ export default function SelectionBar({
             }}
           >
             Reload
+          </button>
+          <button
+            className="btn-outline-secondary btn-sm"
+            onClick={handleExport}
+            style={{ marginLeft: "10px" }}
+          >
+            Export PDF
           </button>
 
           <button

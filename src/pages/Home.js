@@ -51,7 +51,6 @@ export default function Home() {
   const [activeQuestionId, setActiveQuestionId] = useState(null);
   const [mode, setMode] = useState("view");
   const [toast, setToast] = useState(null);
-
   // create-mode form
   const [newNoteText, setNewNoteText] = useState("");
   const [newFiles, setNewFiles] = useState([]);
@@ -984,6 +983,7 @@ export default function Home() {
           showToast={showToast}
           handleDeleteAssignment={handleDeleteAssignment}
           handleDeleteChapter={handleDeleteChapter}
+          questions={questions}
         />
 
         {!selectedChapter || !selectedAssignment ? (
