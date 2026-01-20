@@ -14,15 +14,15 @@
   --warning: #ffc107;
   /* Yellow */
 
-  --bg-dark: #212529;
+  --bg-dark: #1a1b1d;
   /* Deep charcoal background (Dark body) */
-  --bg-light: #2c3034;
+  --bg-light: #222324;
   /* Slightly lighter background for cards/panels */
   --text-primary: #f8f9fa;
   /* Light text for readability */
   --text-secondary: #adb5bd;
   /* Muted text */
-  --border-color: #495057;
+  --border-color: #0000006b;
   /* Subtle border for inputs/dividers */
 
   --radius: 0.25rem;
@@ -41,7 +41,7 @@
 }
 
 body {
-  font-family: 'Inter', 'Arial', sans-serif;
+  font-family: monospace;
   background-color: var(--bg-dark);
   color: var(--text-primary);
   line-height: 1.5;
@@ -565,6 +565,11 @@ button:disabled,
   /* Make buttons fill the width */
   text-align: center;
   padding: 12px 20px;
+}
+
+.ghost-btn:disabled {
+  color: var(--text-secondary);
+  background-color: var(--border-color);
 }
 
 input[type="file"]::file-selector-button {
