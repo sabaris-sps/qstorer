@@ -1,33 +1,34 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import download from "downloadjs"; // For triggering the download
+import download from "downloadjs";
 
 export function sanitizePublicId(name) {
   if (!name) return "";
-
   return name
-    .normalize("NFKD") // break apart combined characters
-    .replace(/[^\w\-\/.]+/g, "-") // replace disallowed chars (no emojis)
-    .replace(/-+/g, "-") // collapse multiple dashes
-    .replace(/^-+|-+$/g, "") // trim starting/ending dashes
-    .slice(-200); // limit length for safety
+    .normalize("NFKD")
+    .replace(/[^\w\-\/.]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(-200);
 }
 
-// A standard A4 size in points
 const A4_WIDTH_PTS = 595;
 const A4_HEIGHT_PTS = 842;
-const MARGIN = 20; // 30 points (~10mm) margin
+const MARGIN = 20;
 const USABLE_WIDTH = A4_WIDTH_PTS - 2 * MARGIN;
 
-/**
- * Safely fetches and embeds an image. Returns null on failure.
- */
+// Configuration for spacing
+const SPACING = {
+  HEADER_HEIGHT: 24, // Font size 14 + 10 padding
+  LINE_HEIGHT: 12,
+  AFTER_TEXT: 15,
+  AFTER_IMAGE: 5,
+  SEPARATOR: 30,
+};
+
 const safeEmbedImage = async (pdfDoc, imageUrl) => {
   try {
     const imageBytes = await fetch(imageUrl).then((res) => {
-      if (!res.ok) {
-        // Throw an error if the HTTP status is not 200-299
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       return res.arrayBuffer();
     });
 
@@ -49,25 +50,13 @@ const safeEmbedImage = async (pdfDoc, imageUrl) => {
   }
 };
 
-/**
- * Manually wraps text based on font size and available width.
- * @param {PDFFont} font - The embedded font object (Helvetica).
- * @param {string} text - The text to wrap.
- * @param {number} size - Font size.
- * @param {number} maxWidth - The available width in points.
- * @returns {Array<string>} - An array of wrapped lines.
- */
 const wrapText = (font, text, size, maxWidth) => {
   if (!text) return [];
-
-  // FIX: Replace newlines with space, then strip all non-ASCII/control characters
-  // that the standard PDF font cannot encode.
   const sanitizedText = text
     .replace(/[\r\n]+/g, " ")
-    .replace(/[^\x00-\x7F]+/g, "") // Strip non-ASCII characters (e.g., weird unicode)
+    .replace(/[^\x00-\x7F]+/g, "")
     .trim();
   const words = sanitizedText.split(" ");
-
   if (words.length === 0 || words[0] === "") return [];
 
   let lines = [];
@@ -75,13 +64,9 @@ const wrapText = (font, text, size, maxWidth) => {
 
   for (let i = 1; i < words.length; i++) {
     const word = words[i];
-    if (!word) continue; // Skip empty strings that might result from extra spaces
-
+    if (!word) continue;
     const combinedLine = currentLine + " " + word;
-
-    // Measure the width of the combined line
     const width = font.widthOfTextAtSize(combinedLine, size);
-
     if (width < maxWidth) {
       currentLine = combinedLine;
     } else {
@@ -89,90 +74,147 @@ const wrapText = (font, text, size, maxWidth) => {
       currentLine = word;
     }
   }
-  lines.push(currentLine); // Push the last line
+  lines.push(currentLine);
   return lines;
 };
 
-// Helper to check if new content fits on the current page
-const checkPageBreak = (page, cursorY, requiredHeight) => {
-  // Check if the Y-coordinate of the bottom of the new content
-  // (cursorY - requiredHeight) falls below the bottom MARGIN.
-  if (cursorY - requiredHeight < MARGIN) {
-    return true; // Indicates a page break is needed
-  }
-  return false;
+// Helper to check if we need a page break for a specific single element
+const checkPageBreak = (cursorY, requiredHeight) => {
+  return cursorY - requiredHeight < MARGIN;
 };
 
-/**
- * Exports all questions (notes and images) to a single A4 PDF document using pdf-lib.
- * @param {Array<Object>} questions - The list of question objects.
- */
 export const exportQuestionsToPDF = async (questions) => {
   if (!questions || questions.length === 0) {
     alert("No questions available to export.");
     return;
   }
 
-  // 1. Setup Document
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Courier);
   const fontBold = await pdfDoc.embedFont(StandardFonts.CourierBold);
 
   let page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
-  let cursorY = A4_HEIGHT_PTS - MARGIN; // Start at top margin
+  let cursorY = A4_HEIGHT_PTS - MARGIN;
 
-  // 2. Iterate through Questions
   for (let index = 0; index < questions.length; index++) {
     const question = questions[index];
     const questionNumber = index + 1;
 
     try {
-      // --- Question Header ---
-      const headerText = `QUESTION ${questionNumber}`;
-      const headerFontSize = 14;
-      const headerHeight = headerFontSize + 10;
+      // ---------------------------------------------------------
+      // PHASE 1: PRE-CALCULATION
+      // We calculate heights and prepare data BEFORE drawing.
+      // ---------------------------------------------------------
 
-      // Calculate where the cursor MUST be *after* drawing the header (top-aligned)
-      const newCursorYHeader = cursorY - headerHeight;
+      // 1. Text Calculation
+      const noteText = question.note || "";
+      const noteFontSize = 12;
+      const textLines = wrapText(font, noteText, noteFontSize, USABLE_WIDTH);
+      const textBlockHeight = textLines.length * SPACING.LINE_HEIGHT;
+      
+      // 2. Image Processing & Calculation
+      // We load images now to know their exact dimensions
+      const processedImages = [];
+      let totalImagesHeight = 0;
 
-      // Check break (add page if needed)
-      if (checkPageBreak(page, cursorY, headerHeight)) {
-        // Check if space is available for header
+      if (question.images && question.images.length > 0) {
+        for (const imageUrl of question.images) {
+          if (!imageUrl) continue;
+          
+          const pdfImage = await safeEmbedImage(pdfDoc, imageUrl);
+          if (!pdfImage) continue;
+
+          // Calculate Dimensions
+          const { width, height } = pdfImage;
+          const scaleFactor = USABLE_WIDTH / width;
+          let imgDisplayWidth = USABLE_WIDTH;
+          let imgDisplayHeight = height * scaleFactor;
+
+          // Cap max height (approx half page)
+          const MAX_HEIGHT_RATIO = 0.5;
+          const maxHeight = (A4_HEIGHT_PTS - 2 * MARGIN) * MAX_HEIGHT_RATIO;
+
+          if (imgDisplayHeight > maxHeight) {
+            imgDisplayHeight = maxHeight;
+            imgDisplayWidth = width * (maxHeight / height);
+          }
+
+          processedImages.push({
+            imgObj: pdfImage,
+            width: imgDisplayWidth,
+            height: imgDisplayHeight,
+          });
+
+          totalImagesHeight += imgDisplayHeight + SPACING.AFTER_IMAGE;
+        }
+      }
+
+      // 3. Total Height Calculation
+      // Header + Text + (Space after text) + Images + Separator
+      const totalBlockHeight =
+        SPACING.HEADER_HEIGHT +
+        textBlockHeight +
+        (textLines.length > 0 ? SPACING.AFTER_TEXT : 0) +
+        totalImagesHeight +
+        SPACING.SEPARATOR;
+
+      // ---------------------------------------------------------
+      // PHASE 2: PAGE BREAK DECISION
+      // ---------------------------------------------------------
+      
+      const spaceRemaining = cursorY - MARGIN;
+      const fullPageHeight = A4_HEIGHT_PTS - 2 * MARGIN;
+
+      let forceNewPage = false;
+
+      // Case A: It fits in the remaining space? -> Do nothing, just draw.
+      if (totalBlockHeight <= spaceRemaining) {
+         forceNewPage = false;
+      } 
+      // Case B: It doesn't fit here, but fits on a fresh page? -> New Page.
+      else if (totalBlockHeight <= fullPageHeight) {
+         forceNewPage = true;
+      } 
+      // Case C: It's massive (bigger than 1 page).
+      // We start a new page to maximize space, then let it flow naturally.
+      else {
+         // Only force new page if we have used more than 20% of the current page
+         // otherwise we might as well use the space we have.
+         if (spaceRemaining < fullPageHeight * 0.8) {
+             forceNewPage = true;
+         }
+      }
+
+      if (forceNewPage) {
         page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
         cursorY = A4_HEIGHT_PTS - MARGIN;
       }
 
-      cursorY -= headerFontSize; // Set cursor for drawing (draws from cursorY upwards)
-      page.drawText(headerText, {
+      // ---------------------------------------------------------
+      // PHASE 3: DRAWING
+      // Now we draw sequentially using the pre-calculated data
+      // ---------------------------------------------------------
+
+      // --- Draw Header ---
+      cursorY -= 14; // Font size
+      page.drawText(`QUESTION ${questionNumber}`, {
         x: MARGIN,
         y: cursorY,
-        size: headerFontSize,
+        size: 14,
         font: fontBold,
-        color: rgb(0.0, 0.0, 0.0), // Primary blue color
+        color: rgb(0.0, 0.0, 0.0),
       });
-      cursorY -= 10; // Space after header
+      cursorY -= 10; // Padding
 
-      // --- Note Section ---
-      const noteText = question.note || ""; // Use 'note' property
-      const noteFontSize = 12;
-      const lineHeight = 12;
-
-      // *** FIX APPLIED HERE: Use the custom wrapText helper ***
-      const textLines = wrapText(font, noteText, noteFontSize, USABLE_WIDTH);
-      // *** END FIX ***
-
-      const textBlockHeight = textLines.length * lineHeight;
-      const totalNoteHeight = textBlockHeight + 15; // Block height + post-note space
-
-      // Check break (add page if needed)
-      if (checkPageBreak(page, cursorY, totalNoteHeight)) {
-        page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
-        cursorY = A4_HEIGHT_PTS - MARGIN;
+      // --- Draw Text ---
+      // Safety check: Does text fit? (Only relevant if Case C occurred)
+      if (checkPageBreak(cursorY, textBlockHeight + SPACING.AFTER_TEXT)) {
+         page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
+         cursorY = A4_HEIGHT_PTS - MARGIN;
       }
 
-      // Draw text line by line, updating cursorY with each line
       for (const line of textLines) {
-        cursorY -= lineHeight;
+        cursorY -= SPACING.LINE_HEIGHT;
         page.drawText(line, {
           x: MARGIN,
           y: cursorY,
@@ -181,136 +223,82 @@ export const exportQuestionsToPDF = async (questions) => {
           color: rgb(0.0, 0.0, 0.0),
         });
       }
-      cursorY -= 15; // Space after notes
+      if (textLines.length > 0) cursorY -= SPACING.AFTER_TEXT;
 
-      // --- Images ---
-      if (question.images && question.images.length > 0) {
-        for (let imgIndex = 0; imgIndex < question.images.length; imgIndex++) {
-          const imageUrl = question.images[imgIndex];
+      // --- Draw Images ---
+      for (const imgData of processedImages) {
+        const requiredHeight = imgData.height + SPACING.AFTER_IMAGE;
 
-          if (!imageUrl) continue;
-
-          // --- USE NEW SAFE HELPER ---
-          const pdfImage = await safeEmbedImage(pdfDoc, imageUrl);
-
-          if (!pdfImage) {
-            // If embedding failed, draw a placeholder and continue to the next image/question.
-            cursorY -= 30;
-            page.drawText(
-              `[Image Failed to Load: ${imageUrl.substring(0, 50)}...]`,
-              {
-                x: MARGIN,
-                y: cursorY,
-                size: 8,
-                color: rgb(0.8, 0, 0),
-              }
-            );
-            cursorY -= 10;
-            continue;
-          }
-          // ---------------------------
-
-          // Calculate Dimensions for A4 fit
-          const { width, height } = pdfImage;
-          // ... (Rest of Fix 1 logic for sizing) ...
-
-          // 1. Maintain aspect ratio and fit to USABLE_WIDTH
-          const scaleFactor = USABLE_WIDTH / width;
-          let imgDisplayWidth = USABLE_WIDTH;
-          let imgDisplayHeight = height * scaleFactor;
-          const imgPadding = 5;
-
-          // 2. DIMINISHING FIX (keep this for smaller images)
-          const MAX_HEIGHT_RATIO = 0.5;
-          const maxHeight = (A4_HEIGHT_PTS - 2 * MARGIN) * MAX_HEIGHT_RATIO;
-
-          if (imgDisplayHeight > maxHeight) {
-            imgDisplayHeight = maxHeight; // Cap the height
-            imgDisplayWidth = width * (maxHeight / height); // Recalculate width based on capped height
-          }
-
-          // 3. Page Break Check
-          const requiredHeight = imgDisplayHeight + imgPadding;
-
-          if (checkPageBreak(page, cursorY, requiredHeight)) {
-            page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
-            cursorY = A4_HEIGHT_PTS - MARGIN;
-          }
-
-          cursorY -= imgDisplayHeight; // Move cursor to the top of the image position
-
-          page.drawImage(pdfImage, {
-            x: MARGIN + (USABLE_WIDTH - imgDisplayWidth) / 2, // Center the image if scaled down
-            y: cursorY,
-            width: imgDisplayWidth,
-            height: imgDisplayHeight,
-          });
-          page.drawRectangle({
-            x: MARGIN + (USABLE_WIDTH - imgDisplayWidth) / 2, // Center the image if scaled down
-            y: cursorY,
-            width: imgDisplayWidth,
-            height: imgDisplayHeight,
-            borderWidth: 1,
-            borderColor: rgb(0,0,0),
-            color: rgb(0,0,0),
-            opacity: 0,
-            borderOpacity: 1,
-          });
-
-          cursorY -= imgPadding; // Space after image
+        // Check break for this specific image
+        if (checkPageBreak(cursorY, requiredHeight)) {
+          page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
+          cursorY = A4_HEIGHT_PTS - MARGIN;
         }
+
+        cursorY -= imgData.height;
+
+        page.drawImage(imgData.imgObj, {
+          x: MARGIN + (USABLE_WIDTH - imgData.width) / 2,
+          y: cursorY,
+          width: imgData.width,
+          height: imgData.height,
+        });
+
+        // Optional Border
+        page.drawRectangle({
+          x: MARGIN + (USABLE_WIDTH - imgData.width) / 2,
+          y: cursorY,
+          width: imgData.width,
+          height: imgData.height,
+          borderWidth: 1,
+          borderColor: rgb(0, 0, 0),
+          color: rgb(0, 0, 0),
+          opacity: 0,
+          borderOpacity: 1,
+        });
+
+        cursorY -= SPACING.AFTER_IMAGE;
       }
-      // ... (Rest of the outer loop) ...
 
       // --- Separator ---
-      const separatorThickness = 0.5;
-      const totalSeparatorSpace = 30; // 20 points of space before + line thickness + 20 points of space after
-
-      if (checkPageBreak(page, cursorY, totalSeparatorSpace)) {
+      if (checkPageBreak(cursorY, 30)) {
         page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
         cursorY = A4_HEIGHT_PTS - MARGIN;
       }
 
-      cursorY -= 10; // Space before the line
-
-      // Draw dividing line
+      cursorY -= 10;
       page.drawLine({
         start: { x: MARGIN, y: cursorY },
         end: { x: A4_WIDTH_PTS - MARGIN, y: cursorY },
-        thickness: separatorThickness,
+        thickness: 0.5,
         color: rgb(0.0, 0.0, 0.0),
       });
-
-      cursorY -= 5; // Space after the line (40 total points of vertical space used)
-      
+      cursorY -= 5;
       page.drawLine({
         start: { x: MARGIN, y: cursorY },
         end: { x: A4_WIDTH_PTS - MARGIN, y: cursorY },
-        thickness: separatorThickness,
+        thickness: 0.5,
         color: rgb(0.0, 0.0, 0.0),
       });
       cursorY -= 10;
-    } catch (e) {
-      // Log the failure but allow the overall function to continue to the next question.
-      console.error(
-        `Skipping Question ${questionNumber} due to critical error:`,
-        e
-      );
 
-      // Draw a large failure message for this question in the PDF
-      page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
-      cursorY = A4_HEIGHT_PTS - MARGIN - 20;
-      page.drawText(`--- QUESTION ${questionNumber} FAILED TO EXPORT ---`, {
+    } catch (e) {
+      console.error(`Skipping Question ${questionNumber} error:`, e);
+      // Fallback error message
+      if(checkPageBreak(cursorY, 50)) {
+          page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
+          cursorY = A4_HEIGHT_PTS - MARGIN;
+      }
+      cursorY -= 20;
+      page.drawText(`ERR: Q${questionNumber} Export Failed`, {
         x: MARGIN,
         y: cursorY,
-        size: 16,
-        font: fontBold,
+        size: 12,
         color: rgb(0.8, 0, 0),
       });
     }
   }
 
-  // 3. Finalize and Download
   const pdfBytes = await pdfDoc.save();
   download(pdfBytes, "QStorer_Export.pdf", "application/pdf");
 };
