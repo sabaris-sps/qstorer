@@ -15,7 +15,7 @@ export function sanitizePublicId(name) {
 // A standard A4 size in points
 const A4_WIDTH_PTS = 595;
 const A4_HEIGHT_PTS = 842;
-const MARGIN = 30; // 30 points (~10mm) margin
+const MARGIN = 20; // 30 points (~10mm) margin
 const USABLE_WIDTH = A4_WIDTH_PTS - 2 * MARGIN;
 
 /**
@@ -115,8 +115,8 @@ export const exportQuestionsToPDF = async (questions) => {
 
   // 1. Setup Document
   const pdfDoc = await PDFDocument.create();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const font = await pdfDoc.embedFont(StandardFonts.Courier);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.CourierBold);
 
   let page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
   let cursorY = A4_HEIGHT_PTS - MARGIN; // Start at top margin
@@ -128,7 +128,7 @@ export const exportQuestionsToPDF = async (questions) => {
 
     try {
       // --- Question Header ---
-      const headerText = `Question ${questionNumber}`;
+      const headerText = `QUESTION ${questionNumber}`;
       const headerFontSize = 14;
       const headerHeight = headerFontSize + 10;
 
@@ -148,13 +148,13 @@ export const exportQuestionsToPDF = async (questions) => {
         y: cursorY,
         size: headerFontSize,
         font: fontBold,
-        color: rgb(0.36, 0.7, 0.99), // Primary blue color
+        color: rgb(0.0, 0.0, 0.0), // Primary blue color
       });
       cursorY -= 10; // Space after header
 
       // --- Note Section ---
-      const noteText = question.note || "No note provided."; // Use 'note' property
-      const noteFontSize = 10;
+      const noteText = question.note || ""; // Use 'note' property
+      const noteFontSize = 12;
       const lineHeight = 12;
 
       // *** FIX APPLIED HERE: Use the custom wrapText helper ***
@@ -178,7 +178,7 @@ export const exportQuestionsToPDF = async (questions) => {
           y: cursorY,
           size: noteFontSize,
           font: font,
-          color: rgb(0.7, 0.7, 0.7),
+          color: rgb(0.0, 0.0, 0.0),
         });
       }
       cursorY -= 15; // Space after notes
@@ -218,10 +218,10 @@ export const exportQuestionsToPDF = async (questions) => {
           const scaleFactor = USABLE_WIDTH / width;
           let imgDisplayWidth = USABLE_WIDTH;
           let imgDisplayHeight = height * scaleFactor;
-          const imgPadding = 10;
+          const imgPadding = 5;
 
           // 2. DIMINISHING FIX (keep this for smaller images)
-          const MAX_HEIGHT_RATIO = 0.8;
+          const MAX_HEIGHT_RATIO = 0.5;
           const maxHeight = (A4_HEIGHT_PTS - 2 * MARGIN) * MAX_HEIGHT_RATIO;
 
           if (imgDisplayHeight > maxHeight) {
@@ -245,6 +245,17 @@ export const exportQuestionsToPDF = async (questions) => {
             width: imgDisplayWidth,
             height: imgDisplayHeight,
           });
+          page.drawRectangle({
+            x: MARGIN + (USABLE_WIDTH - imgDisplayWidth) / 2, // Center the image if scaled down
+            y: cursorY,
+            width: imgDisplayWidth,
+            height: imgDisplayHeight,
+            borderWidth: 1,
+            borderColor: rgb(0,0,0),
+            color: rgb(0,0,0),
+            opacity: 0,
+            borderOpacity: 1,
+          });
 
           cursorY -= imgPadding; // Space after image
         }
@@ -253,24 +264,32 @@ export const exportQuestionsToPDF = async (questions) => {
 
       // --- Separator ---
       const separatorThickness = 0.5;
-      const totalSeparatorSpace = 40; // 20 points of space before + line thickness + 20 points of space after
+      const totalSeparatorSpace = 30; // 20 points of space before + line thickness + 20 points of space after
 
       if (checkPageBreak(page, cursorY, totalSeparatorSpace)) {
         page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
         cursorY = A4_HEIGHT_PTS - MARGIN;
       }
 
-      cursorY -= 20; // Space before the line
+      cursorY -= 10; // Space before the line
 
       // Draw dividing line
       page.drawLine({
         start: { x: MARGIN, y: cursorY },
         end: { x: A4_WIDTH_PTS - MARGIN, y: cursorY },
         thickness: separatorThickness,
-        color: rgb(0.3, 0.3, 0.3),
+        color: rgb(0.0, 0.0, 0.0),
       });
 
-      cursorY -= 20; // Space after the line (40 total points of vertical space used)
+      cursorY -= 5; // Space after the line (40 total points of vertical space used)
+      
+      page.drawLine({
+        start: { x: MARGIN, y: cursorY },
+        end: { x: A4_WIDTH_PTS - MARGIN, y: cursorY },
+        thickness: separatorThickness,
+        color: rgb(0.0, 0.0, 0.0),
+      });
+      cursorY -= 10;
     } catch (e) {
       // Log the failure but allow the overall function to continue to the next question.
       console.error(
