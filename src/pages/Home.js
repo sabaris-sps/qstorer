@@ -150,7 +150,14 @@ export default function Home() {
     try {
       const uid = auth.currentUser.uid;
       const snap = await getDocs(
-        collection(db, "users", uid, "chapters", selectedChapter, "assignments")
+        collection(
+          db,
+          "users",
+          uid,
+          "chapters",
+          selectedChapter,
+          "assignments",
+        ),
       );
       const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setAssignments(arr);
@@ -174,16 +181,16 @@ export default function Home() {
           selectedChapter,
           "assignments",
           selectedAssignment,
-          "questions"
+          "questions",
         ),
-        orderBy("number", "asc")
+        orderBy("number", "asc"),
       );
       const snap = await getDocs(q);
       const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setQuestions(arr);
       if (arr.length > 0) {
         setActiveQuestionId((prev) =>
-          prev >= arr.length ? arr[0].id || null : prev
+          prev >= arr.length ? arr[0].id || null : prev,
         );
       } else {
         setActiveQuestionId(null);
@@ -195,10 +202,12 @@ export default function Home() {
     }
   }
 
-  // create question (in create-mode)
-  async function handleCreateQuestion(e) {
+  // create question (Modified for Bulk Mode)
+  async function handleCreateQuestion(e, bulkFiles = null, isBulk = false) {
     e.preventDefault();
-    if (!newNoteText.trim() && newFiles.length === 0) {
+
+    // 1. Validation
+    if (!isBulk && !newNoteText.trim() && newFiles.length === 0) {
       showToast("Enter question note/image", "error");
       return;
     }
@@ -209,14 +218,13 @@ export default function Home() {
 
     try {
       const uid = auth.currentUser.uid;
-      // determine next number
-      const nextNum = questions.length + 1;
 
-      // find chapter and assignment names for filename
+      // 2. Fetch Chapter/Assignment Names (Do this once for both modes)
       const chapDoc = (
         await getDocs(collection(db, "users", uid, "chapters"))
       ).docs.find((d) => d.id === selectedChapter);
       const chapName = chapDoc?.data()?.name || "chapter";
+
       const asgDoc = (
         await getDocs(
           collection(
@@ -225,44 +233,88 @@ export default function Home() {
             uid,
             "chapters",
             selectedChapter,
-            "assignments"
-          )
+            "assignments",
+          ),
         )
       ).docs.find((d) => d.id === selectedAssignment);
       const asgName = asgDoc?.data()?.name || "assignment";
 
-      // upload images to cloudinary
-      const uploaded = [];
-      for (const f of newFiles) {
-        const name = `${chapName}-${asgName}-${nextNum}-${Date.now()}`;
-        const url = await uploadToCloudinary(f, sanitizePublicId(name));
-        uploaded.push(url);
-      }
+      // 3. Collection Reference
+      const questionsCollectionRef = collection(
+        db,
+        "users",
+        uid,
+        "chapters",
+        selectedChapter,
+        "assignments",
+        selectedAssignment,
+        "questions",
+      );
 
-      const new_question = await addDoc(
-        collection(
-          db,
-          "users",
-          uid,
-          "chapters",
-          selectedChapter,
-          "assignments",
-          selectedAssignment,
-          "questions"
-        ),
-        {
+      // =========================================================
+      // OPTION A: BULK MODE (One Question Per Image)
+      // =========================================================
+      if (isBulk && bulkFiles && bulkFiles.length > 0) {
+        showToast(`Uploading ${bulkFiles.length} questions...`);
+
+        // Calculate the starting number based on current count
+        let startNum = questions.length + 1;
+
+        // Process all files in parallel
+        const uploadPromises = bulkFiles.map(async (file, index) => {
+          const currentNum = startNum + index;
+          const name = `${chapName}-${asgName}-${currentNum}-${Date.now()}`;
+
+          // Upload to Cloudinary
+          const url = await uploadToCloudinary(file, sanitizePublicId(name));
+
+          // Create the document
+          return addDoc(questionsCollectionRef, {
+            number: currentNum,
+            note: "", // Empty note for bulk uploads
+            images: [url], // Single image per question
+          });
+        });
+
+        // Wait for all uploads and DB creates to finish
+        const newDocs = await Promise.all(uploadPromises);
+
+        showToast(`${bulkFiles.length} questions created!`);
+
+        // Update active ID to the first created question
+        if (newDocs.length > 0) {
+          setActiveQuestionId(newDocs[0].id);
+        }
+      }
+      // =========================================================
+      // OPTION B: STANDARD MODE (Existing Logic)
+      // =========================================================
+      else {
+        const nextNum = questions.length + 1;
+
+        // upload images to cloudinary
+        const uploaded = [];
+        for (const f of newFiles) {
+          const name = `${chapName}-${asgName}-${nextNum}-${Date.now()}`;
+          const url = await uploadToCloudinary(f, sanitizePublicId(name));
+          uploaded.push(url);
+        }
+
+        const new_question = await addDoc(questionsCollectionRef, {
           number: nextNum,
           note: newNoteText,
           images: uploaded,
-        }
-      );
+        });
 
-      showToast("Question created");
+        showToast("Question created");
+        setActiveQuestionId(new_question.id);
+      }
+
+      // 4. Cleanup (Common)
       setNewNoteText("");
       setNewFiles([]);
-      await loadQuestions();
-      setActiveQuestionId(new_question.id);
       setMode("view");
+      await loadQuestions();
     } catch (err) {
       console.error(err);
       showToast("Create failed", "error");
@@ -292,7 +344,7 @@ export default function Home() {
         "assignments",
         selectedAssignment,
         "questions",
-        activeQuestionId
+        activeQuestionId,
       );
       await updateDoc(dref, { note: noteEdit });
       setSaveNoteBtn(true);
@@ -318,7 +370,14 @@ export default function Home() {
         chapSnap.docs.find((d) => d.id === selectedChapter)?.data()?.name ||
         "chapter";
       const asgSnap = await getDocs(
-        collection(db, "users", uid, "chapters", selectedChapter, "assignments")
+        collection(
+          db,
+          "users",
+          uid,
+          "chapters",
+          selectedChapter,
+          "assignments",
+        ),
       );
       const asgName =
         asgSnap.docs.find((d) => d.id === selectedAssignment)?.data()?.name ||
@@ -342,7 +401,7 @@ export default function Home() {
         "assignments",
         selectedAssignment,
         "questions",
-        activeQuestionId
+        activeQuestionId,
       );
       await updateDoc(dref, { images: arrayUnion(...urls) });
 
@@ -377,8 +436,8 @@ export default function Home() {
           "assignments",
           selectedAssignment,
           "questions",
-          qid
-        )
+          qid,
+        ),
       );
 
       // re-number remaining questions
@@ -392,10 +451,10 @@ export default function Home() {
             selectedChapter,
             "assignments",
             selectedAssignment,
-            "questions"
+            "questions",
           ),
-          orderBy("number", "asc")
-        )
+          orderBy("number", "asc"),
+        ),
       );
       const docs = qSnap.docs;
       for (let i = 0; i < docs.length; i++) {
@@ -431,8 +490,8 @@ export default function Home() {
           selectedChapter,
           "assignments",
           assignId,
-          "questions"
-        )
+          "questions",
+        ),
       );
       for (const d of qSnap.docs) {
         await deleteDoc(d.ref);
@@ -447,8 +506,8 @@ export default function Home() {
           "chapters",
           selectedChapter,
           "assignments",
-          assignId
-        )
+          assignId,
+        ),
       );
 
       showToast("Assignment deleted");
@@ -469,7 +528,7 @@ export default function Home() {
       const uid = auth.currentUser.uid;
       // list assignments
       const asSnap = await getDocs(
-        collection(db, "users", uid, "chapters", chapId, "assignments")
+        collection(db, "users", uid, "chapters", chapId, "assignments"),
       );
       for (const a of asSnap.docs) {
         // delete questions inside assignment
@@ -482,8 +541,8 @@ export default function Home() {
             chapId,
             "assignments",
             a.id,
-            "questions"
-          )
+            "questions",
+          ),
         );
         for (const q of qSnap.docs) {
           await deleteDoc(q.ref);
@@ -525,7 +584,7 @@ export default function Home() {
         "assignments",
         selectedAssignment,
         "questions",
-        activeQuestionId
+        activeQuestionId,
       );
 
       await updateDoc(dref, { images: arrayRemove(img_url) });
@@ -558,7 +617,7 @@ export default function Home() {
       const map = {};
       for (const chap of chapters) {
         const snap = await getDocs(
-          collection(db, "users", uid, "chapters", chap.id, "assignments")
+          collection(db, "users", uid, "chapters", chap.id, "assignments"),
         );
         map[chap.id] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       }
@@ -602,7 +661,7 @@ export default function Home() {
         "assignments",
         selectedAssignment,
         "questions",
-        activeQuestionId
+        activeQuestionId,
       );
 
       const srcData = activeQuestion; // using local state; you may fetch fresh if needed
@@ -618,10 +677,10 @@ export default function Home() {
             moveTargetChapter,
             "assignments",
             moveTargetAssignment,
-            "questions"
+            "questions",
           ),
-          orderBy("number", "asc")
-        )
+          orderBy("number", "asc"),
+        ),
       );
       const destNextNum = destQSnap.size + 1;
 
@@ -645,9 +704,9 @@ export default function Home() {
           moveTargetChapter,
           "assignments",
           moveTargetAssignment,
-          "questions"
+          "questions",
         ),
-        newQuestionPayload
+        newQuestionPayload,
       );
 
       // delete original
@@ -664,10 +723,10 @@ export default function Home() {
             selectedChapter,
             "assignments",
             selectedAssignment,
-            "questions"
+            "questions",
           ),
-          orderBy("number", "asc")
-        )
+          orderBy("number", "asc"),
+        ),
       );
       const docs = qSnap.docs;
       for (let i = 0; i < docs.length; i++) {
@@ -761,7 +820,7 @@ export default function Home() {
       if (missing.length > 0) {
         showToast(
           `Question number(s) not found: ${missing.join(", ")}`,
-          "error"
+          "error",
         );
         setBulkByNumbersLoading(false);
         return;
@@ -778,10 +837,10 @@ export default function Home() {
             moveTargetChapter,
             "assignments",
             moveTargetAssignment,
-            "questions"
+            "questions",
           ),
-          orderBy("number", "asc")
-        )
+          orderBy("number", "asc"),
+        ),
       );
       let destNextNum = destQSnap.size + 1;
 
@@ -801,9 +860,9 @@ export default function Home() {
             moveTargetChapter,
             "assignments",
             moveTargetAssignment,
-            "questions"
+            "questions",
           ),
-          payload
+          payload,
         );
         destNextNum++;
       }
@@ -820,8 +879,8 @@ export default function Home() {
             "assignments",
             selectedAssignment,
             "questions",
-            qObj.id
-          )
+            qObj.id,
+          ),
         );
       }
 
@@ -836,10 +895,10 @@ export default function Home() {
             selectedChapter,
             "assignments",
             selectedAssignment,
-            "questions"
+            "questions",
           ),
-          orderBy("number", "asc")
-        )
+          orderBy("number", "asc"),
+        ),
       );
       for (let i = 0; i < qSnap.docs.length; i++) {
         const d = qSnap.docs[i];
@@ -887,7 +946,7 @@ export default function Home() {
       "chapters",
       selectedChapter,
       "assignments",
-      selectedAssignment
+      selectedAssignment,
     );
     await updateDoc(dref, { name: assignmentNameEdit });
     showToast("Assignment name updated");
@@ -900,7 +959,7 @@ export default function Home() {
       if (!e.altKey && e.key === "ArrowRight") {
         e.preventDefault();
         const currentIndex = questions.findIndex(
-          (q) => q.id === activeQuestionId
+          (q) => q.id === activeQuestionId,
         );
         if (currentIndex !== -1 && currentIndex < questions.length - 1) {
           const nextQ = questions[currentIndex + 1];
@@ -909,7 +968,7 @@ export default function Home() {
       } else if (!e.altKey && e.key === "ArrowLeft") {
         e.preventDefault();
         const currentIndex = questions.findIndex(
-          (q) => q.id === activeQuestionId
+          (q) => q.id === activeQuestionId,
         );
         if (currentIndex > 0) {
           const prevQ = questions[currentIndex - 1];
@@ -920,7 +979,7 @@ export default function Home() {
         if (e.altKey && e.key === "ArrowRight") {
           e.preventDefault();
           setPhotoIndex((prev) =>
-            Math.min(prev + 1, activeQuestion.images.length - 1)
+            Math.min(prev + 1, activeQuestion.images.length - 1),
           );
         } else if (e.altKey && e.key === "ArrowLeft") {
           e.preventDefault();
@@ -996,6 +1055,7 @@ export default function Home() {
             handleCreateQuestion={handleCreateQuestion}
             newNoteText={newNoteText}
             setNewNoteText={setNewNoteText}
+            newFiles={newFiles}
             setNewFiles={setNewFiles}
             setMode={setMode}
           />
