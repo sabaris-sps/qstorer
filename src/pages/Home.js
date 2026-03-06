@@ -1092,6 +1092,7 @@ export default function Home() {
             noteEdit={noteEdit}
             setNoteEdit={setNoteEdit}
             saveNoteBtn={saveNoteBtn}
+            moreFiles={moreFiles}
             setMoreFiles={setMoreFiles}
             handleUploadMoreImages={handleUploadMoreImages}
             uploadImagesBtn={uploadImagesBtn}

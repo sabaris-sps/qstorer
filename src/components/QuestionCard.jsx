@@ -1,4 +1,4 @@
-import { FileUploader } from "react-drag-drop-files";
+import ImageInput from "../ui/InputImage";
 import { PhotoProvider, PhotoView } from "react-photo-view";
 
 export default function QuestionCard({
@@ -29,6 +29,7 @@ export default function QuestionCard({
   noteEdit,
   setNoteEdit,
   saveNoteBtn,
+  moreFiles,
   setMoreFiles,
   handleUploadMoreImages,
   uploadImagesBtn,
@@ -335,19 +336,14 @@ export default function QuestionCard({
       <div className="upload-more">
         <label>Upload More Images</label>
 
-        <FileUploader
-          handleChange={(files) => setMoreFiles([...files])}
-          name="more-files"
-          types={["JPG", "PNG", "GIF", "JPEG"]}
-          maxSize={10}
-          multiple
-        />
+        <ImageInput files={moreFiles} setFiles={setMoreFiles} />
 
         <div style={{ marginTop: 8 }}>
           {uploadImagesBtn ? (
             <button
               className="btn-primary btn-sm"
               onClick={handleUploadMoreImages}
+              disabled={moreFiles?.length === 0}
             >
               Upload & Append
             </button>
