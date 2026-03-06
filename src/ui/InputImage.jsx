@@ -1,7 +1,22 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { FileUploader } from "react-drag-drop-files";
 
 export default function ImageInput({ files, setFiles }) {
+  // Refs for Drag and Drop tracking
+  const dragItem = useRef(null);
+  const dragOverItem = useRef(null);
+
+  // --- Helper: Natural Sort Function ---
+  const sortFilesByName = (fileList) => {
+    return [...fileList].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+    );
+  };
+
+  // --- 1. Handle Window Paste Events ---
   useEffect(() => {
     const handlePaste = (e) => {
       const items = e.clipboardData.items;
@@ -10,7 +25,6 @@ export default function ImageInput({ files, setFiles }) {
       for (let i = 0; i < items.length; i++) {
         if (items[i].type.indexOf("image") !== -1) {
           const blob = items[i].getAsFile();
-          // Timestamp ensures unique sorting for Bulk Mode
           const newFile = new File([blob], `pasted-${Date.now()}-${i}.png`, {
             type: blob.type,
           });
@@ -19,7 +33,8 @@ export default function ImageInput({ files, setFiles }) {
       }
 
       if (pastedFiles.length > 0) {
-        setFiles((prev) => [...prev, ...pastedFiles]);
+        // Add new files, THEN sort everything
+        setFiles((prev) => sortFilesByName([...prev, ...pastedFiles]));
       }
     };
 
@@ -27,9 +42,32 @@ export default function ImageInput({ files, setFiles }) {
     return () => window.removeEventListener("paste", handlePaste);
   }, [setFiles]);
 
-  // --- 2. Remove File Helper ---
+  // --- 2. Handle Drag & Drop Uploads ---
+  const handleUploadChange = (newlyAdded) => {
+    // Add new files, THEN sort everything
+    setFiles((prev) => sortFilesByName([...prev, ...newlyAdded]));
+  };
+
+  // --- 3. Remove File ---
   const handleRemove = (indexToRemove) => {
     setFiles(files.filter((_, index) => index !== indexToRemove));
+  };
+
+  // --- 4. Manual Reordering Logic ---
+  const handleSort = () => {
+    // Duplicate items
+    let _files = [...files];
+
+    // Remove the dragged item
+    const draggedItemContent = _files.splice(dragItem.current, 1)[0];
+
+    // Insert it at the new position
+    _files.splice(dragOverItem.current, 0, draggedItemContent);
+
+    // Update state
+    dragItem.current = null;
+    dragOverItem.current = null;
+    setFiles(_files);
   };
 
   return (
@@ -50,16 +88,14 @@ export default function ImageInput({ files, setFiles }) {
 
       {/* Third-party Uploader */}
       <FileUploader
-        handleChange={(newlyAdded) =>
-          setFiles((prev) => [...prev, ...newlyAdded])
-        }
+        handleChange={handleUploadChange}
         name="file-uploader"
         types={["JPG", "PNG", "GIF", "JPEG"]}
         maxSize={10}
         multiple
       />
 
-      {/* --- 3. Custom File List Preview --- */}
+      {/* --- Custom File List Preview (Sortable) --- */}
       {files?.length > 0 && (
         <div
           style={{
@@ -77,33 +113,66 @@ export default function ImageInput({ files, setFiles }) {
               color: "var(--text-secondary)",
             }}
           >
-            Selected Files ({files.length}):
+            Selected Files ({files.length}) -
+            <span style={{ fontSize: "0.8rem", marginLeft: 5 }}>
+              Drag items to reorder
+            </span>
           </p>
+
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             {files.map((file, index) => (
               <div
                 key={index}
+                draggable
+                onDragStart={(e) => {
+                  dragItem.current = index;
+                  e.target.style.opacity = "0.5"; // Visual feedback
+                }}
+                onDragEnter={(e) => {
+                  dragOverItem.current = index;
+                  // Optional: Add visual highlight to target here
+                }}
+                onDragEnd={(e) => {
+                  e.target.style.opacity = "1"; // Reset opacity
+                  handleSort();
+                }}
+                onDragOver={(e) => e.preventDefault()} // Necessary to allow dropping
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
                   fontSize: "0.85rem",
-                  padding: "6px 10px",
+                  padding: "8px 10px",
                   background: "rgba(255,255,255,0.05)",
                   borderRadius: 4,
+                  cursor: "grab", // Show grab cursor
+                  border: "1px solid transparent",
+                  transition: "background 0.2s",
                 }}
+                className="draggable-item"
               >
-                <span
+                <div
                   style={{
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
                     maxWidth: "85%",
-                    color: "var(--text-primary)",
                   }}
                 >
-                  {file.name}
-                </span>
+                  <span style={{ color: "var(--text-secondary)" }}>☰</span>{" "}
+                  {/* Drag Handle Icon */}
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    {file.name}
+                  </span>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => handleRemove(index)}
@@ -114,7 +183,7 @@ export default function ImageInput({ files, setFiles }) {
                     cursor: "pointer",
                     padding: 4,
                     lineHeight: 1,
-                    fontSize: "1.1rem",
+                    fontSize: "1.2rem",
                   }}
                   title="Remove file"
                 >

@@ -15,17 +15,8 @@ export default function CreateQuestion({
     e.preventDefault();
 
     if (isBulkMode && newFiles && newFiles.length > 0) {
-      // Sort files naturally (img1, img2, img10)
-      const sortedFiles = [...newFiles].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, {
-          numeric: true,
-          sensitivity: "base",
-        }),
-      );
-      // Submit as bulk
-      handleCreateQuestion(e, sortedFiles, true);
+      handleCreateQuestion(e, newFiles, true);
     } else {
-      // Submit as standard
       handleCreateQuestion(e, null, false);
     }
   };
@@ -34,7 +25,6 @@ export default function CreateQuestion({
     <div className="form-page">
       <h2>{isBulkMode ? "Bulk Upload Questions" : "Create Question"}</h2>
 
-      {/* Bulk Toggle */}
       <div className="toggle-container">
         <span className="toggle-label">Bulk Mode (One Question per Image)</span>
         <label className="switch">
@@ -48,7 +38,6 @@ export default function CreateQuestion({
       </div>
 
       <form onSubmit={handleSubmit}>
-        {/* Standard Note Input */}
         {!isBulkMode && (
           <>
             <label style={{ fontWeight: "bold" }}>Note</label>
@@ -61,11 +50,10 @@ export default function CreateQuestion({
           </>
         )}
 
-        {/* Reusable Image Input Component */}
         <div style={{ marginTop: isBulkMode ? 0 : 15, marginBottom: 15 }}>
+          {/* Files are sorted/reordered inside this component */}
           <ImageInput files={newFiles} setFiles={setNewFiles} />
 
-          {/* Helper Text for Bulk Mode */}
           {isBulkMode && newFiles?.length > 0 && (
             <p
               style={{
@@ -75,12 +63,11 @@ export default function CreateQuestion({
               }}
             >
               Will create <strong>{newFiles.length}</strong> separate questions
-              sorted by filename.
+              in the order shown above.
             </p>
           )}
         </div>
 
-        {/* Actions */}
         <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
           <button className="btn-primary" type="submit">
             {isBulkMode ? "Create All Questions" : "Add Question"}
