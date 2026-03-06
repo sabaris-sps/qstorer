@@ -138,7 +138,7 @@ export default function QuestionCard({
                         assignmentsByChapter[chapId].length > 0
                       ) {
                         setMoveTargetAssignment(
-                          assignmentsByChapter[chapId][0].id
+                          assignmentsByChapter[chapId][0].id,
                         );
                       }
                     }
@@ -276,8 +276,8 @@ export default function QuestionCard({
       )}
       <PhotoProvider
         key={activeQuestion.id}
-        pullClosable={false}
-        maskClosable={false}
+        pullClosable={true}
+        maskClosable={true}
         index={photoIndex}
         visible={photoViewerVisible}
         onVisibleChange={setPhotoViewerVisible}
