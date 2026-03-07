@@ -47,6 +47,8 @@ export default function QuestionCard({
   selectedChapter,
   selectedAssignment,
   handleUpdateColor,
+  isCopyMode,
+  setIsCopyMode,
 }) {
   const [showColorTray, setShowColorTray] = useState(false);
 
@@ -59,6 +61,7 @@ export default function QuestionCard({
     setMoveTargetChapter(selectedChapter || "");
     setMoveTargetAssignment(selectedAssignment || "");
     loadAssignmentsForAllChapters();
+    if (setIsCopyMode) setIsCopyMode(false); // Reset on open
   }
   return (
     <div className="question-card">
@@ -128,7 +131,7 @@ export default function QuestionCard({
             onClick={openMoveUI}
             style={{ marginLeft: 8 }}
           >
-            Move
+            Move/Copy
           </button>
         </div>
       </div>
@@ -138,7 +141,9 @@ export default function QuestionCard({
         <div className="modal-backdrop" onClick={() => setMoveOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <h4 style={{ margin: 0 }}>Move Question</h4>
+              <h4 style={{ margin: 0 }}>
+                {isCopyMode ? "Copy" : "Move"} Question
+              </h4>
 
               {/* simple tab buttons */}
               <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
@@ -148,7 +153,7 @@ export default function QuestionCard({
                   }`}
                   onClick={() => setMoveTab("move")}
                 >
-                  Move
+                  {isCopyMode ? "Copy" : "Move"}
                 </button>
                 <button
                   className={`btn-outline-primary btn-sm ${
@@ -156,15 +161,17 @@ export default function QuestionCard({
                   }`}
                   onClick={() => setMoveTab("bulk")}
                 >
-                  Bulk Move
+                  Bulk {isCopyMode ? "Copy" : "Move"}
                 </button>
               </div>
             </div>
 
             <p style={{ marginTop: 6, color: "#555" }}>
               {moveTab === "move"
-                ? "Choose destination chapter and assignment"
-                : "Enter comma-separated question numbers from the current assignment"}
+                ? `Choose destination to ${
+                    isCopyMode ? "copy" : "move"
+                  } this question`
+                : `Enter numbers to ${isCopyMode ? "copy" : "move"}`}
             </p>
 
             <div
@@ -176,6 +183,29 @@ export default function QuestionCard({
                 flexDirection: "column",
               }}
             >
+              {/* === TOGGLE SWITCH FOR COPY MODE === */}
+              <div
+                className="toggle-container"
+                style={{
+                  width: "100%",
+                  marginTop: 10,
+                  marginBottom: 10,
+                  padding: "8px 12px",
+                }}
+              >
+                <span className="toggle-label" style={{ fontSize: "0.9rem" }}>
+                  Copy instead of Move?
+                </span>
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={isCopyMode}
+                    onChange={(e) => setIsCopyMode(e.target.checked)}
+                  />
+                  <span className="slider"></span>
+                </label>
+              </div>
+              {/* === END TOGGLE SWITCH === */}
               <div
                 style={{
                   marginTop: 12,
@@ -250,7 +280,13 @@ export default function QuestionCard({
                       onClick={handleMoveQuestion}
                       disabled={moveLoading}
                     >
-                      {moveLoading ? "Moving..." : "Move"}
+                      {moveLoading
+                        ? isCopyMode
+                          ? "Copying..."
+                          : "Moving..."
+                        : isCopyMode
+                          ? "Copy"
+                          : "Move"}
                     </button>
                     <button
                       className="btn-outline-secondary"
@@ -274,7 +310,7 @@ export default function QuestionCard({
                   >
                     <input
                       type="text"
-                      placeholder="(e.g. 19, 12, 7, 2-5, 3 - 9)"
+                      placeholder="(e.g. 19, 12, 7, 2-5)"
                       value={bulkNumbersInput}
                       onChange={(e) => setBulkNumbersInput(e.target.value)}
                       style={{
@@ -289,7 +325,13 @@ export default function QuestionCard({
                       onClick={handleBulkMoveByNumbers}
                       disabled={bulkByNumbersLoading}
                     >
-                      {bulkByNumbersLoading ? "Moving..." : "Move"}
+                      {bulkByNumbersLoading
+                        ? isCopyMode
+                          ? "Copying..."
+                          : "Moving..."
+                        : isCopyMode
+                          ? "Copy"
+                          : "Move"}
                     </button>
                     <button
                       className="btn-outline-secondary"
@@ -310,8 +352,12 @@ export default function QuestionCard({
 
             <div style={{ marginTop: 12, color: "#666", fontSize: 13 }}>
               {moveTab === "move"
-                ? "The question's note and images will be copied to the destination and removed from the current assignment. Numbers in both assignments will be re-ordered."
-                : "Numbers that don't exist in the current assignment will be reported and prevent the move. Matching questions will be moved in ascending-number order and appended to the destination."}
+                ? isCopyMode
+                  ? "The question will be duplicated to the destination. The original remains here."
+                  : "The question will be moved to the destination and removed from here."
+                : isCopyMode
+                  ? "Matching questions will be duplicated to the destination."
+                  : "Matching questions will be moved to the destination."}
             </div>
           </div>
         </div>

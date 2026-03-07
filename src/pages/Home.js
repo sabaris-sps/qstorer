@@ -67,12 +67,15 @@ export default function Home() {
 
   const nav = useNavigate();
 
-  // Move-popup related state (add these lines)
+  // Move-popup related state
   const [moveOpen, setMoveOpen] = useState(false);
   const [moveTargetChapter, setMoveTargetChapter] = useState("");
   const [moveTargetAssignment, setMoveTargetAssignment] = useState("");
   const [moveLoading, setMoveLoading] = useState(false);
   const [assignmentsByChapter, setAssignmentsByChapter] = useState({});
+
+  // NEW: Copy Mode State
+  const [isCopyMode, setIsCopyMode] = useState(false);
 
   // Tabs + bulk input
   const [moveTab, setMoveTab] = useState("move"); // "move" or "bulk"
@@ -681,7 +684,7 @@ export default function Home() {
     try {
       const uid = auth.currentUser.uid;
 
-      // fresh src ref
+      // src ref
       const srcRef = doc(
         db,
         "users",
@@ -694,7 +697,7 @@ export default function Home() {
         activeQuestionId,
       );
 
-      const srcData = activeQuestion; // using local state; you may fetch fresh if needed
+      const srcData = activeQuestion;
 
       // determine next number in destination
       const destQSnap = await getDocs(
@@ -718,6 +721,7 @@ export default function Home() {
         ...((srcData && {
           note: srcData.note,
           images: srcData.images || [],
+          color: srcData.color || null, // preserve color if exists
         }) || {
           note: "",
           images: [],
@@ -739,35 +743,39 @@ export default function Home() {
         newQuestionPayload,
       );
 
-      // delete original
-      await deleteDoc(srcRef);
+      // === ONLY DELETE FROM SOURCE IF NOT IN COPY MODE ===
+      if (!isCopyMode) {
+        // delete original
+        await deleteDoc(srcRef);
 
-      // re-number remaining in source
-      const qSnap = await getDocs(
-        query(
-          collection(
-            db,
-            "users",
-            uid,
-            "chapters",
-            selectedChapter,
-            "assignments",
-            selectedAssignment,
-            "questions",
+        // re-number remaining in source
+        const qSnap = await getDocs(
+          query(
+            collection(
+              db,
+              "users",
+              uid,
+              "chapters",
+              selectedChapter,
+              "assignments",
+              selectedAssignment,
+              "questions",
+            ),
+            orderBy("number", "asc"),
           ),
-          orderBy("number", "asc"),
-        ),
-      );
-      const docs = qSnap.docs;
-      for (let i = 0; i < docs.length; i++) {
-        const d = docs[i];
-        const correct = i + 1;
-        if (d.data().number !== correct) {
-          await updateDoc(d.ref, { number: correct });
+        );
+        const docs = qSnap.docs;
+        for (let i = 0; i < docs.length; i++) {
+          const d = docs[i];
+          const correct = i + 1;
+          if (d.data().number !== correct) {
+            await updateDoc(d.ref, { number: correct });
+          }
         }
+        showToast("Question moved");
+      } else {
+        showToast("Question copied");
       }
-
-      showToast("Question moved");
 
       // refresh UI
       await loadAssignments();
@@ -779,9 +787,10 @@ export default function Home() {
       setMoveTargetAssignment("");
       setMoveTargetChapter("");
       setMoveLoading(false);
+      setIsCopyMode(false); // Reset copy mode
     } catch (e) {
-      console.error("move failed", e);
-      showToast("Move failed", "error");
+      console.error("move/copy failed", e);
+      showToast("Action failed", "error");
       setMoveLoading(false);
     }
   }
@@ -874,11 +883,12 @@ export default function Home() {
       );
       let destNextNum = destQSnap.size + 1;
 
-      // Add matched questions to destination in ascending order (matched already in ascending by nums)
+      // Add matched questions to destination in ascending order
       for (const qObj of matched) {
         const payload = {
           note: qObj.note ?? "",
           images: qObj.images ?? [],
+          color: qObj.color || null,
           number: destNextNum,
         };
         await addDoc(
@@ -897,48 +907,53 @@ export default function Home() {
         destNextNum++;
       }
 
-      // Delete originals by id (we can safely delete using qObj.id)
-      for (const qObj of matched) {
-        await deleteDoc(
-          doc(
-            db,
-            "users",
-            uid,
-            "chapters",
-            selectedChapter,
-            "assignments",
-            selectedAssignment,
-            "questions",
-            qObj.id,
+      // === ONLY DELETE FROM SOURCE IF NOT IN COPY MODE ===
+      if (!isCopyMode) {
+        // Delete originals by id
+        for (const qObj of matched) {
+          await deleteDoc(
+            doc(
+              db,
+              "users",
+              uid,
+              "chapters",
+              selectedChapter,
+              "assignments",
+              selectedAssignment,
+              "questions",
+              qObj.id,
+            ),
+          );
+        }
+
+        // Re-number remaining in source
+        const qSnap = await getDocs(
+          query(
+            collection(
+              db,
+              "users",
+              uid,
+              "chapters",
+              selectedChapter,
+              "assignments",
+              selectedAssignment,
+              "questions",
+            ),
+            orderBy("number", "asc"),
           ),
         );
-      }
-
-      // Re-number remaining in source
-      const qSnap = await getDocs(
-        query(
-          collection(
-            db,
-            "users",
-            uid,
-            "chapters",
-            selectedChapter,
-            "assignments",
-            selectedAssignment,
-            "questions",
-          ),
-          orderBy("number", "asc"),
-        ),
-      );
-      for (let i = 0; i < qSnap.docs.length; i++) {
-        const d = qSnap.docs[i];
-        const correct = i + 1;
-        if (d.data().number !== correct) {
-          await updateDoc(d.ref, { number: correct });
+        for (let i = 0; i < qSnap.docs.length; i++) {
+          const d = qSnap.docs[i];
+          const correct = i + 1;
+          if (d.data().number !== correct) {
+            await updateDoc(d.ref, { number: correct });
+          }
         }
+        showToast(`${matched.length} question(s) moved`);
+      } else {
+        showToast(`${matched.length} question(s) copied`);
       }
 
-      showToast(`${matched.length} question(s) moved`);
       // refresh UI
       await loadAssignments();
       await loadQuestions();
@@ -947,9 +962,10 @@ export default function Home() {
       setBulkNumbersInput("");
       setMoveTab("move");
       setMoveOpen(false);
+      setIsCopyMode(false);
     } catch (err) {
-      console.error("bulk move by numbers failed", err);
-      showToast("Bulk move failed", "error");
+      console.error("bulk move/copy by numbers failed", err);
+      showToast("Bulk action failed", "error");
     } finally {
       setBulkByNumbersLoading(false);
     }
@@ -1131,6 +1147,8 @@ export default function Home() {
             selectedChapter={selectedChapter}
             selectedAssignment={selectedAssignment}
             handleUpdateColor={handleUpdateColor}
+            isCopyMode={isCopyMode}
+            setIsCopyMode={setIsCopyMode}
           />
         ) : (
           <div className="placeholder">Select a question number</div>
