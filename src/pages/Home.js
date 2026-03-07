@@ -595,6 +595,36 @@ export default function Home() {
     }
   }
 
+  async function handleUpdateColor(colorHex) {
+    if (!activeQuestionId) return;
+
+    // Optimistic UI Update (makes it feel instant)
+    setQuestions((prev) =>
+      prev.map((q) =>
+        q.id === activeQuestionId ? { ...q, color: colorHex } : q,
+      ),
+    );
+
+    try {
+      const uid = auth.currentUser.uid;
+      const dref = doc(
+        db,
+        "users",
+        uid,
+        "chapters",
+        selectedChapter,
+        "assignments",
+        selectedAssignment,
+        "questions",
+        activeQuestionId,
+      );
+      await updateDoc(dref, { color: colorHex });
+    } catch (e) {
+      console.error("Failed to save color", e);
+      showToast("Failed to save color", "error");
+    }
+  }
+
   // expose reload when user logs in
   useEffect(() => {
     if (user) loadChaptersForUser();
@@ -1100,6 +1130,7 @@ export default function Home() {
             showToast={showToast}
             selectedChapter={selectedChapter}
             selectedAssignment={selectedAssignment}
+            handleUpdateColor={handleUpdateColor}
           />
         ) : (
           <div className="placeholder">Select a question number</div>

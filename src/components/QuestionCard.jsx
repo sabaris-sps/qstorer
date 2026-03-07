@@ -1,5 +1,14 @@
 import ImageInput from "../ui/InputImage";
 import { PhotoProvider, PhotoView } from "react-photo-view";
+import React, { useState } from "react";
+
+const COLORS = [
+  "#ef476f", // Red/Pink
+  "#ffd166", // Yellow/Gold
+  "#06d6a0", // Green
+  "#118ab2", // Blue
+  "#b185db", // Purple (or transparent for 'clear')
+];
 
 export default function QuestionCard({
   activeQuestion,
@@ -37,7 +46,10 @@ export default function QuestionCard({
   showToast,
   selectedChapter,
   selectedAssignment,
+  handleUpdateColor,
 }) {
+  const [showColorTray, setShowColorTray] = useState(false);
+
   function openMoveUI() {
     if (!activeQuestion) {
       showToast("Select a question first", "error");
@@ -52,7 +64,57 @@ export default function QuestionCard({
     <div className="question-card">
       <div className="qhead">
         <h3>Question {activeQuestion.number}</h3>
-        <div>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          {/* === COLOR PICKER (MOVED HERE) === */}
+          <div className="color-tray-wrapper">
+            {/* The Trigger Button */}
+            <div
+              className="color-trigger-btn"
+              style={{ backgroundColor: activeQuestion.color || "grey" }}
+              onClick={() => setShowColorTray(!showColorTray)} // Toggle on click
+              title="Color Marker"
+            />
+
+            {/* The Tray */}
+            {showColorTray && (
+              <div className="color-tray">
+                {/* Clear (X) Option */}
+                <div
+                  className="color-option"
+                  style={{
+                    background: "transparent",
+                    border: "1px solid var(--text-secondary)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "10px",
+                    color: "var(--text-secondary)",
+                  }}
+                  onClick={() => {
+                    handleUpdateColor(null);
+                    setShowColorTray(false);
+                  }}
+                  title="Remove Color"
+                >
+                  ✕
+                </div>
+
+                {/* Color Dots */}
+                {COLORS.map((c) => (
+                  <div
+                    key={c}
+                    className="color-option"
+                    style={{ backgroundColor: c }}
+                    onClick={() => {
+                      handleUpdateColor(c);
+                      setShowColorTray(false);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          {/* === END COLOR PICKER === */}
           <button
             className="btn-danger btn-sm"
             onClick={() => handleDeleteQuestion(activeQuestion.id)}

@@ -18,6 +18,13 @@ export default function Sidebar({
             onClick={() => handleSelectQuestion(q.id)}
           >
             {q.number}
+            {/* Render the Dot if color exists */}
+            {q.color && (
+              <span
+                className="color-dot"
+                style={{ backgroundColor: q.color }}
+              />
+            )}
           </button>
         ))}
         {selectedChapter && selectedAssignment && (
