@@ -23,7 +23,11 @@ export default function SelectionBar({
   const handleExport = async () => {
     if (questions && questions.length > 0) {
       try {
-        await exportQuestionsToPDF(questions);
+        const id = selectedAssignment;
+        const name = assignments.filter((assignment) => assignment.id === id)[0]
+          .name;
+        console.log(name);
+        await exportQuestionsToPDF(questions, name);
       } catch (error) {
         console.error("PDF Export failed:", error);
         // Optionally show a toast error here
@@ -90,10 +94,11 @@ export default function SelectionBar({
             onClick={() => {
               setEditTab("chapter");
               setChapterNameEdit(
-                chapters.find((c) => c.id === selectedChapter)?.name || ""
+                chapters.find((c) => c.id === selectedChapter)?.name || "",
               );
               setAssignmentNameEdit(
-                assignments.find((a) => a.id === selectedAssignment)?.name || ""
+                assignments.find((a) => a.id === selectedAssignment)?.name ||
+                  "",
               );
               if (selectedChapter) setShowEditNamesPopup(true);
               else showToast("No chapter selected", "error");

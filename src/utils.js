@@ -83,7 +83,7 @@ const checkPageBreak = (cursorY, requiredHeight) => {
   return cursorY - requiredHeight < MARGIN;
 };
 
-export const exportQuestionsToPDF = async (questions) => {
+export const exportQuestionsToPDF = async (questions, name) => {
   if (!questions || questions.length === 0) {
     alert("No questions available to export.");
     return;
@@ -111,7 +111,7 @@ export const exportQuestionsToPDF = async (questions) => {
       const noteFontSize = 12;
       const textLines = wrapText(font, noteText, noteFontSize, USABLE_WIDTH);
       const textBlockHeight = textLines.length * SPACING.LINE_HEIGHT;
-      
+
       // 2. Image Processing & Calculation
       // We load images now to know their exact dimensions
       const processedImages = [];
@@ -120,7 +120,7 @@ export const exportQuestionsToPDF = async (questions) => {
       if (question.images && question.images.length > 0) {
         for (const imageUrl of question.images) {
           if (!imageUrl) continue;
-          
+
           const pdfImage = await safeEmbedImage(pdfDoc, imageUrl);
           if (!pdfImage) continue;
 
@@ -161,7 +161,7 @@ export const exportQuestionsToPDF = async (questions) => {
       // ---------------------------------------------------------
       // PHASE 2: PAGE BREAK DECISION
       // ---------------------------------------------------------
-      
+
       const spaceRemaining = cursorY - MARGIN;
       const fullPageHeight = A4_HEIGHT_PTS - 2 * MARGIN;
 
@@ -169,20 +169,20 @@ export const exportQuestionsToPDF = async (questions) => {
 
       // Case A: It fits in the remaining space? -> Do nothing, just draw.
       if (totalBlockHeight <= spaceRemaining) {
-         forceNewPage = false;
-      } 
+        forceNewPage = false;
+      }
       // Case B: It doesn't fit here, but fits on a fresh page? -> New Page.
       else if (totalBlockHeight <= fullPageHeight) {
-         forceNewPage = true;
-      } 
+        forceNewPage = true;
+      }
       // Case C: It's massive (bigger than 1 page).
       // We start a new page to maximize space, then let it flow naturally.
       else {
-         // Only force new page if we have used more than 20% of the current page
-         // otherwise we might as well use the space we have.
-         if (spaceRemaining < fullPageHeight * 0.8) {
-             forceNewPage = true;
-         }
+        // Only force new page if we have used more than 20% of the current page
+        // otherwise we might as well use the space we have.
+        if (spaceRemaining < fullPageHeight * 0.8) {
+          forceNewPage = true;
+        }
       }
 
       if (forceNewPage) {
@@ -209,8 +209,8 @@ export const exportQuestionsToPDF = async (questions) => {
       // --- Draw Text ---
       // Safety check: Does text fit? (Only relevant if Case C occurred)
       if (checkPageBreak(cursorY, textBlockHeight + SPACING.AFTER_TEXT)) {
-         page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
-         cursorY = A4_HEIGHT_PTS - MARGIN;
+        page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
+        cursorY = A4_HEIGHT_PTS - MARGIN;
       }
 
       for (const line of textLines) {
@@ -281,13 +281,12 @@ export const exportQuestionsToPDF = async (questions) => {
         color: rgb(0.0, 0.0, 0.0),
       });
       cursorY -= 10;
-
     } catch (e) {
       console.error(`Skipping Question ${questionNumber} error:`, e);
       // Fallback error message
-      if(checkPageBreak(cursorY, 50)) {
-          page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
-          cursorY = A4_HEIGHT_PTS - MARGIN;
+      if (checkPageBreak(cursorY, 50)) {
+        page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
+        cursorY = A4_HEIGHT_PTS - MARGIN;
       }
       cursorY -= 20;
       page.drawText(`ERR: Q${questionNumber} Export Failed`, {
@@ -300,5 +299,5 @@ export const exportQuestionsToPDF = async (questions) => {
   }
 
   const pdfBytes = await pdfDoc.save();
-  download(pdfBytes, "QStorer_Export.pdf", "application/pdf");
+  download(pdfBytes, `${name}.pdf`, "application/pdf");
 };
