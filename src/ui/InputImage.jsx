@@ -2,11 +2,10 @@ import React, { useEffect, useRef } from "react";
 import { FileUploader } from "react-drag-drop-files";
 
 export default function ImageInput({ files, setFiles }) {
-  // Refs for Drag and Drop tracking
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
 
-  // --- Helper: Natural Sort Function ---
+  // --- Helper: Natural Sort ---
   const sortFilesByName = (fileList) => {
     return [...fileList].sort((a, b) =>
       a.name.localeCompare(b.name, undefined, {
@@ -16,55 +15,83 @@ export default function ImageInput({ files, setFiles }) {
     );
   };
 
-  // --- 1. Handle Window Paste Events ---
+  // --- 1. Handle "Ctrl+V" (Desktop) ---
   useEffect(() => {
     const handlePaste = (e) => {
-      const items = e.clipboardData.items;
+      // Only run this if we have clipboard data in the event (Desktop)
+      if (e.clipboardData && e.clipboardData.items) {
+        const items = e.clipboardData.items;
+        const pastedFiles = [];
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf("image") !== -1) {
+            const blob = items[i].getAsFile();
+            const newFile = new File([blob], `pasted-${Date.now()}-${i}.png`, {
+              type: blob.type,
+            });
+            pastedFiles.push(newFile);
+          }
+        }
+        if (pastedFiles.length > 0) {
+          setFiles((prev) => sortFilesByName([...prev, ...pastedFiles]));
+        }
+      }
+    };
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [setFiles]);
+
+  // --- 2. Handle "Paste Button" Click (Tablet/Mobile) ---
+  const handleManualPaste = async () => {
+    try {
+      // Check if the browser supports reading from clipboard
+      if (!navigator.clipboard || !navigator.clipboard.read) {
+        alert(
+          "Your browser does not support reading images from the clipboard.",
+        );
+        return;
+      }
+
+      const clipboardItems = await navigator.clipboard.read();
       const pastedFiles = [];
 
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf("image") !== -1) {
-          const blob = items[i].getAsFile();
-          const newFile = new File([blob], `pasted-${Date.now()}-${i}.png`, {
-            type: blob.type,
+      for (const item of clipboardItems) {
+        // Find image types (png, jpeg, etc.)
+        const imageType = item.types.find((type) => type.startsWith("image/"));
+
+        if (imageType) {
+          const blob = await item.getType(imageType);
+          // Create a file from the blob
+          const newFile = new File([blob], `pasted-mobile-${Date.now()}.png`, {
+            type: imageType,
           });
           pastedFiles.push(newFile);
         }
       }
 
       if (pastedFiles.length > 0) {
-        // Add new files, THEN sort everything
         setFiles((prev) => sortFilesByName([...prev, ...pastedFiles]));
+      } else {
+        alert("No image found in clipboard!");
       }
-    };
+    } catch (err) {
+      console.error("Failed to read clipboard contents: ", err);
+      alert("Please allow clipboard permissions to paste images.");
+    }
+  };
 
-    window.addEventListener("paste", handlePaste);
-    return () => window.removeEventListener("paste", handlePaste);
-  }, [setFiles]);
-
-  // --- 2. Handle Drag & Drop Uploads ---
+  // --- 3. Drag & Drop Handlers ---
   const handleUploadChange = (newlyAdded) => {
-    // Add new files, THEN sort everything
     setFiles((prev) => sortFilesByName([...prev, ...newlyAdded]));
   };
 
-  // --- 3. Remove File ---
   const handleRemove = (indexToRemove) => {
     setFiles(files.filter((_, index) => index !== indexToRemove));
   };
 
-  // --- 4. Manual Reordering Logic ---
   const handleSort = () => {
-    // Duplicate items
     let _files = [...files];
-
-    // Remove the dragged item
     const draggedItemContent = _files.splice(dragItem.current, 1)[0];
-
-    // Insert it at the new position
     _files.splice(dragOverItem.current, 0, draggedItemContent);
-
-    // Update state
     dragItem.current = null;
     dragOverItem.current = null;
     setFiles(_files);
@@ -72,22 +99,43 @@ export default function ImageInput({ files, setFiles }) {
 
   return (
     <div className="image-input-wrapper">
-      <label style={{ fontWeight: "bold", display: "block", marginBottom: 8 }}>
-        Attachments / Images
-        <span
-          style={{
-            fontWeight: "normal",
-            fontSize: "0.8rem",
-            color: "var(--text-secondary)",
-            marginLeft: 8,
-          }}
-        >
-          (Drag, Drop, or Ctrl+V to Paste)
-        </span>
-      </label>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 8,
+          minWidth: "322px",
+          maxWidth: "508px",
+        }}
+      >
+        <label style={{ fontWeight: "bold", display: "block", margin: 0 }}>
+          Attachments
+          <span
+            style={{
+              fontWeight: "normal",
+              fontSize: "0.8rem",
+              color: "var(--text-secondary)",
+              marginLeft: 8,
+            }}
+          >
+            (Drag, Drop, or Paste)
+          </span>
+        </label>
 
-      {/* Third-party Uploader */}
+        {/* MANUAL PASTE BUTTON FOR TABLETS */}
+        <button
+          type="button"
+          onClick={handleManualPaste}
+          className="btn-outline-primary btn-sm"
+          style={{ padding: "4px 10px", fontSize: "0.8rem" }}
+        >
+          Paste Image
+        </button>
+      </div>
+
       <FileUploader
+        label="Upload, drop or paste a file"
         handleChange={handleUploadChange}
         name="file-uploader"
         types={["JPG", "PNG", "GIF", "JPEG"]}
@@ -95,7 +143,6 @@ export default function ImageInput({ files, setFiles }) {
         multiple
       />
 
-      {/* --- Custom File List Preview (Sortable) --- */}
       {files?.length > 0 && (
         <div
           style={{
@@ -126,17 +173,14 @@ export default function ImageInput({ files, setFiles }) {
                 draggable
                 onDragStart={(e) => {
                   dragItem.current = index;
-                  e.target.style.opacity = "0.5"; // Visual feedback
+                  e.target.style.opacity = "0.5";
                 }}
-                onDragEnter={(e) => {
-                  dragOverItem.current = index;
-                  // Optional: Add visual highlight to target here
-                }}
+                onDragEnter={(e) => (dragOverItem.current = index)}
                 onDragEnd={(e) => {
-                  e.target.style.opacity = "1"; // Reset opacity
+                  e.target.style.opacity = "1";
                   handleSort();
                 }}
-                onDragOver={(e) => e.preventDefault()} // Necessary to allow dropping
+                onDragOver={(e) => e.preventDefault()}
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
@@ -145,11 +189,8 @@ export default function ImageInput({ files, setFiles }) {
                   padding: "8px 10px",
                   background: "rgba(255,255,255,0.05)",
                   borderRadius: 4,
-                  cursor: "grab", // Show grab cursor
-                  border: "1px solid transparent",
-                  transition: "background 0.2s",
+                  cursor: "grab",
                 }}
-                className="draggable-item"
               >
                 <div
                   style={{
@@ -159,8 +200,7 @@ export default function ImageInput({ files, setFiles }) {
                     maxWidth: "85%",
                   }}
                 >
-                  <span style={{ color: "var(--text-secondary)" }}>☰</span>{" "}
-                  {/* Drag Handle Icon */}
+                  <span style={{ color: "var(--text-secondary)" }}>☰</span>
                   <span
                     style={{
                       overflow: "hidden",
@@ -172,7 +212,6 @@ export default function ImageInput({ files, setFiles }) {
                     {file.name}
                   </span>
                 </div>
-
                 <button
                   type="button"
                   onClick={() => handleRemove(index)}
@@ -181,11 +220,9 @@ export default function ImageInput({ files, setFiles }) {
                     border: "none",
                     color: "var(--danger)",
                     cursor: "pointer",
-                    padding: 4,
-                    lineHeight: 1,
                     fontSize: "1.2rem",
+                    padding: "0 5px",
                   }}
-                  title="Remove file"
                 >
                   &times;
                 </button>
