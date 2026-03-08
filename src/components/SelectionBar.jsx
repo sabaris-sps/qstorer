@@ -30,7 +30,6 @@ export default function SelectionBar({
     return assignment ? assignment.name : "questions";
   };
 
-  // 1. Button Click: Just open the modal
   const handleExportClick = () => {
     if (!questions || questions.length === 0) {
       showToast("No questions to export", "error");
@@ -39,10 +38,11 @@ export default function SelectionBar({
     setShowExportModal(true);
   };
 
-  // 2. Modal Confirm: Actually generate PDF
-  const handleConfirmExport = async (fileName) => {
+  // Modal Confirm: Actually generate PDF
+  const handleConfirmExport = async (fileName, options) => {
     try {
-      await exportQuestionsToPDF(questions, fileName);
+      // Pass the options (includeNotes) to the utility
+      await exportQuestionsToPDF(questions, fileName, options);
       showToast("PDF Downloaded");
     } catch (error) {
       console.error("PDF Export failed:", error);
