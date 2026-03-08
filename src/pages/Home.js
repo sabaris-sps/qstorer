@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useMemo } from "react";
 import { AppContext } from "../App";
 import {
   collection,
@@ -34,6 +34,28 @@ function Toast({ toast }) {
       {toast.message}
     </div>
   );
+}
+
+function parseNumberList(input) {
+  if (!input || !input.trim()) return [];
+  const nums = new Set();
+  input.split(",").forEach((part) => {
+    const trimmed = part.trim();
+    if (!trimmed) return;
+    const rangeMatch = trimmed.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (rangeMatch) {
+      let start = Number(rangeMatch[1]);
+      let end = Number(rangeMatch[2]);
+      if (!Number.isInteger(start) || !Number.isInteger(end)) return;
+      if (start <= 0 || end <= 0) return;
+      if (end < start) [start, end] = [end, start];
+      for (let n = start; n <= end; n++) nums.add(n);
+      return;
+    }
+    const n = Number(trimmed);
+    if (Number.isInteger(n) && n > 0) nums.add(n);
+  });
+  return Array.from(nums);
 }
 
 export default function Home() {
@@ -804,28 +826,6 @@ export default function Home() {
   }
 
   // --------------------- BULK MOVE HELPERS ---------------------
-  function parseNumberList(input) {
-    if (!input || !input.trim()) return [];
-    const nums = new Set();
-    input.split(",").forEach((part) => {
-      const trimmed = part.trim();
-      if (!trimmed) return;
-      const rangeMatch = trimmed.match(/^(\d+)\s*-\s*(\d+)$/);
-      if (rangeMatch) {
-        let start = Number(rangeMatch[1]);
-        let end = Number(rangeMatch[2]);
-        if (!Number.isInteger(start) || !Number.isInteger(end)) return;
-        if (start <= 0 || end <= 0) return;
-        if (end < start) [start, end] = [end, start];
-        for (let n = start; n <= end; n++) nums.add(n);
-        return;
-      }
-      const n = Number(trimmed);
-      if (Number.isInteger(n) && n > 0) nums.add(n);
-    });
-    return Array.from(nums);
-  }
-
   async function handleBulkMoveByNumbers() {
     // parse input
     const nums = parseNumberList(bulkNumbersInput);
@@ -1003,7 +1003,7 @@ export default function Home() {
   // -----------------------------------------------------------
   // FILTER LOGIC
   // -----------------------------------------------------------
-  const getFilteredQuestions = () => {
+  const visibleQuestions = useMemo(() => {
     // If no filters are active, return original list
     if (!filterConfig.numberText && filterConfig.colors.length === 0) {
       return questions;
@@ -1014,44 +1014,46 @@ export default function Home() {
     const hasColorFilter = filterConfig.colors.length > 0;
 
     return questions.filter((q) => {
-      // 1. Check Number Match (if filter exists)
       const numberMatches = hasNumberFilter
         ? targetNumbers.includes(q.number)
         : true;
-
-      // 2. Check Color Match (if filter exists)
-      // Note: Logic is OR (matches any of the selected colors)
       const colorMatches = hasColorFilter
         ? filterConfig.colors.includes(q.color)
         : true;
-
       return numberMatches && colorMatches;
     });
-  };
-
-  const visibleQuestions = getFilteredQuestions();
+  }, [questions, filterConfig]);
 
   useEffect(() => {
     function handleKeyDown(e) {
+      // 1. Handle Question Navigation (Arrow Left/Right)
       if (!e.altKey && e.key === "ArrowRight") {
         e.preventDefault();
-        const currentIndex = questions.findIndex(
+
+        // Find index inside the FILTERED list
+        const currentIndex = visibleQuestions.findIndex(
           (q) => q.id === activeQuestionId,
         );
-        if (currentIndex !== -1 && currentIndex < questions.length - 1) {
-          const nextQ = questions[currentIndex + 1];
+
+        if (currentIndex !== -1 && currentIndex < visibleQuestions.length - 1) {
+          const nextQ = visibleQuestions[currentIndex + 1];
           handleSelectQuestion(nextQ.id);
         }
       } else if (!e.altKey && e.key === "ArrowLeft") {
         e.preventDefault();
-        const currentIndex = questions.findIndex(
+
+        // Find index inside the FILTERED list
+        const currentIndex = visibleQuestions.findIndex(
           (q) => q.id === activeQuestionId,
         );
+
         if (currentIndex > 0) {
-          const prevQ = questions[currentIndex - 1];
+          const prevQ = visibleQuestions[currentIndex - 1];
           handleSelectQuestion(prevQ.id);
         }
       }
+
+      // 2. Handle Image Navigation (Alt + Arrow Left/Right)
       if (activeQuestion?.images?.length > 0) {
         if (e.altKey && e.key === "ArrowRight") {
           e.preventDefault();
@@ -1067,8 +1069,13 @@ export default function Home() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-    //eslint-disable-next-line
-  }, [photoViewerVisible, activeQuestion, activeQuestionId, questions]);
+  }, [
+    photoViewerVisible,
+    activeQuestion,
+    activeQuestionId,
+    visibleQuestions,
+    handleSelectQuestion,
+  ]);
 
   return (
     <div className="home-grid">
