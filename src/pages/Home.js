@@ -1132,7 +1132,7 @@ export default function Home() {
           showToast={showToast}
           handleDeleteAssignment={handleDeleteAssignment}
           handleDeleteChapter={handleDeleteChapter}
-          questions={questions}
+          questions={visibleQuestions}
         />
 
         {!selectedChapter || !selectedAssignment ? (
