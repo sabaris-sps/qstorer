@@ -1,4 +1,6 @@
+import React, { useState } from "react"; // Added useState
 import { exportQuestionsToPDF } from "../utils";
+import ExportModal from "./ExportModal"; // Import the new modal
 
 export default function SelectionBar({
   selectedChapter,
@@ -20,26 +22,44 @@ export default function SelectionBar({
   handleDeleteChapter,
   questions,
 }) {
-  const handleExport = async () => {
-    if (questions && questions.length > 0) {
-      try {
-        const id = selectedAssignment;
-        const name = assignments.filter((assignment) => assignment.id === id)[0]
-          .name;
-        console.log(name);
-        await exportQuestionsToPDF(questions, name);
-      } catch (error) {
-        console.error("PDF Export failed:", error);
-        // Optionally show a toast error here
-      } finally {
-      }
-    } else {
-      // ... (Handle no questions case, maybe with showToast)
+  const [showExportModal, setShowExportModal] = useState(false);
+
+  // Helper to get current assignment name safely
+  const getCurrentAssignmentName = () => {
+    const assignment = assignments.find((a) => a.id === selectedAssignment);
+    return assignment ? assignment.name : "questions";
+  };
+
+  // 1. Button Click: Just open the modal
+  const handleExportClick = () => {
+    if (!questions || questions.length === 0) {
+      showToast("No questions to export", "error");
+      return;
+    }
+    setShowExportModal(true);
+  };
+
+  // 2. Modal Confirm: Actually generate PDF
+  const handleConfirmExport = async (fileName) => {
+    try {
+      await exportQuestionsToPDF(questions, fileName);
+      showToast("PDF Downloaded");
+    } catch (error) {
+      console.error("PDF Export failed:", error);
+      showToast("Export failed", "error");
     }
   };
 
   return (
     <>
+      {/* Render the Export Modal */}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        defaultName={getCurrentAssignmentName()}
+        onExport={handleConfirmExport}
+      />
+
       <div className="selection-bar">
         <div className="sel-item">
           <label>Chap</label>
@@ -81,9 +101,11 @@ export default function SelectionBar({
           >
             Reload
           </button>
+
+          {/* Updated Export Button */}
           <button
             className="btn-outline-secondary btn-sm"
-            onClick={handleExport}
+            onClick={handleExportClick}
             style={{ marginLeft: "10px" }}
           >
             Export PDF
