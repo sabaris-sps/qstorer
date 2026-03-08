@@ -860,6 +860,36 @@ input:checked+.slider:before {
   border: 2px solid var(--bg-dark);
 }
 
+/* Filter modal */
+
+.icon-btn {
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  transition: all 0.2s;
+}
+
+.icon-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Ensure modal input fits dark theme */
+.modal input[type="text"] {
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+}
+
+.modal input[type="text"]:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

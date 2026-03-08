@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { AppContext } from "../App";
 import {
   collection,
@@ -24,6 +24,7 @@ import CreateQuestion from "../components/CreateQuestion";
 import QuestionCard from "../components/QuestionCard";
 import SelectionBar from "../components/SelectionBar";
 import { sanitizePublicId } from "../utils";
+import FilterModal from "../components/FilterModal";
 
 /* Toast component */
 function Toast({ toast }) {
@@ -87,6 +88,13 @@ export default function Home() {
   const [editTab, setEditTab] = useState("chapter");
   const [chapterNameEdit, setChapterNameEdit] = useState("");
   const [assignmentNameEdit, setAssignmentNameEdit] = useState("");
+
+  // Filter State
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [filterConfig, setFilterConfig] = useState({
+    numberText: "",
+    colors: [],
+  });
 
   // require login
   useEffect(() => {
@@ -798,32 +806,24 @@ export default function Home() {
   // --------------------- BULK MOVE HELPERS ---------------------
   function parseNumberList(input) {
     if (!input || !input.trim()) return [];
-
     const nums = new Set();
-
     input.split(",").forEach((part) => {
       const trimmed = part.trim();
       if (!trimmed) return;
-
-      // match ranges like "5-7" or "5 - 7" (spaces allowed)
       const rangeMatch = trimmed.match(/^(\d+)\s*-\s*(\d+)$/);
       if (rangeMatch) {
         let start = Number(rangeMatch[1]);
         let end = Number(rangeMatch[2]);
         if (!Number.isInteger(start) || !Number.isInteger(end)) return;
         if (start <= 0 || end <= 0) return;
-        // swap if reversed (e.g. "7-5")
         if (end < start) [start, end] = [end, start];
         for (let n = start; n <= end; n++) nums.add(n);
         return;
       }
-
-      // single number
       const n = Number(trimmed);
       if (Number.isInteger(n) && n > 0) nums.add(n);
     });
-
-    return Array.from(nums).sort((a, b) => a - b);
+    return Array.from(nums);
   }
 
   async function handleBulkMoveByNumbers() {
@@ -1000,6 +1000,37 @@ export default function Home() {
     await loadAssignments(); // refresh assignment names
   }
 
+  // -----------------------------------------------------------
+  // FILTER LOGIC
+  // -----------------------------------------------------------
+  const getFilteredQuestions = () => {
+    // If no filters are active, return original list
+    if (!filterConfig.numberText && filterConfig.colors.length === 0) {
+      return questions;
+    }
+
+    const targetNumbers = parseNumberList(filterConfig.numberText);
+    const hasNumberFilter = targetNumbers.length > 0;
+    const hasColorFilter = filterConfig.colors.length > 0;
+
+    return questions.filter((q) => {
+      // 1. Check Number Match (if filter exists)
+      const numberMatches = hasNumberFilter
+        ? targetNumbers.includes(q.number)
+        : true;
+
+      // 2. Check Color Match (if filter exists)
+      // Note: Logic is OR (matches any of the selected colors)
+      const colorMatches = hasColorFilter
+        ? filterConfig.colors.includes(q.color)
+        : true;
+
+      return numberMatches && colorMatches;
+    });
+  };
+
+  const visibleQuestions = getFilteredQuestions();
+
   useEffect(() => {
     function handleKeyDown(e) {
       if (!e.altKey && e.key === "ArrowRight") {
@@ -1058,14 +1089,27 @@ export default function Home() {
         />
       )}
 
+      {/* NEW: Filter Modal */}
+      <FilterModal
+        isOpen={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        currentFilter={filterConfig}
+        onApply={setFilterConfig}
+      />
+
       <Sidebar
-        questions={questions}
+        questions={visibleQuestions}
         activeQuestionId={activeQuestionId}
         setActiveQuestionId={setActiveQuestionId}
         handleSelectQuestion={handleSelectQuestion}
         selectedChapter={selectedChapter}
         selectedAssignment={selectedAssignment}
         setMode={setMode}
+        onOpenFilter={() => setShowFilterModal(true)}
+        canFilter={!!selectedAssignment}
+        isFilterActive={
+          filterConfig.numberText || filterConfig.colors.length > 0
+        }
       />
 
       {/* main panel */}
