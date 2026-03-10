@@ -21,7 +21,9 @@ export default function SelectionBar({
   handleDeleteAssignment,
   handleDeleteChapter,
   questions,
+  isVirtual,
   onCreateVirtual,
+  onEditVirtual,
 }) {
   const [showExportModal, setShowExportModal] = useState(false);
 
@@ -93,13 +95,24 @@ export default function SelectionBar({
         </div>
 
         <div className="sel-actions">
-          <button
-            className="btn-outline-primary btn-sm"
-            onClick={onCreateVirtual}
-            title="Create a filtered cross-assignment view"
-          >
-            New View
-          </button>
+          {!isVirtual && (
+            <button
+              className="btn-outline-primary btn-sm"
+              onClick={onEditVirtual}
+              style={{ marginLeft: 8 }}
+            >
+              Update View
+            </button>
+          )}
+          {isVirtual && (
+            <button
+              className="btn-outline-primary btn-sm"
+              onClick={onEditVirtual}
+              style={{ marginLeft: 8 }}
+            >
+              Update View
+            </button>
+          )}
           <button
             className="btn-outline-secondary btn-sm"
             onClick={() => {
@@ -136,7 +149,7 @@ export default function SelectionBar({
           >
             Edit Names
           </button>
-          {selectedChapter && (
+          {selectedChapter && !isVirtual && (
             <button
               className="btn-danger btn-sm"
               onClick={() => handleDeleteChapter(selectedChapter)}
@@ -149,7 +162,7 @@ export default function SelectionBar({
               className="btn-danger btn-sm"
               onClick={() => handleDeleteAssignment(selectedAssignment)}
             >
-              Del Asgn
+              {!isVirtual ? "Del Asgn" : "Del View"}
             </button>
           )}
         </div>

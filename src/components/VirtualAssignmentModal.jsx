@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { collection, getDocs, addDoc } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  addDoc,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { parseNumberList } from "../utils";
 
@@ -13,8 +19,10 @@ export default function VirtualAssignmentModal({
   loadAssignmentsForAllChapters,
   showToast,
   onSuccess,
+  existingAssignment,
+  currentChapterId,
 }) {
-  const [configMode, setConfigMode] = useState("common"); // 'common' | 'handles'
+  const [configMode, setConfigMode] = useState("common");
   const [targetChapterId, setTargetChapterId] = useState("");
   const [newAssignmentName, setNewAssignmentName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -29,11 +37,46 @@ export default function VirtualAssignmentModal({
     { chapterId: "", assignmentId: "", numbers: "", colors: [] },
   ]);
 
+  const isEditing = !!existingAssignment;
+
   useEffect(() => {
     if (isOpen) {
       loadAssignmentsForAllChapters();
+
+      // PRE-FILL STATE IF EDITING
+      if (existingAssignment) {
+        setNewAssignmentName(existingAssignment.name);
+        setTargetChapterId(currentChapterId);
+
+        const cfg = existingAssignment.config || {};
+        setConfigMode(cfg.mode || "common");
+
+        if (cfg.common) {
+          setCommonNumbers(cfg.common.numbers || "");
+          setCommonColors(cfg.common.colors || []);
+          setCommonAssignments(cfg.common.assignments || []);
+        }
+        if (cfg.handles) {
+          setHandles(
+            cfg.handles.length > 0
+              ? cfg.handles
+              : [{ chapterId: "", assignmentId: "", numbers: "", colors: [] }],
+          );
+        }
+      } else {
+        // RESET STATE FOR NEW CREATION
+        setNewAssignmentName("");
+        setTargetChapterId("");
+        setConfigMode("common");
+        setCommonNumbers("");
+        setCommonColors([]);
+        setCommonAssignments([]);
+        setHandles([
+          { chapterId: "", assignmentId: "", numbers: "", colors: [] },
+        ]);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, existingAssignment, currentChapterId]);
 
   if (!isOpen) return null;
 
@@ -47,13 +90,14 @@ export default function VirtualAssignmentModal({
       return showToast("Please provide a name and target chapter.", "error");
     }
 
-    // Check for duplicate names
+    // Check for duplicate names (only if creating OR changing name)
     const existingAssignments = assignmentsByChapter[targetChapterId] || [];
-    if (
-      existingAssignments.some(
-        (a) => a.name.toLowerCase() === newAssignmentName.trim().toLowerCase(),
-      )
-    ) {
+    const nameExists = existingAssignments.some(
+      (a) =>
+        a.name.toLowerCase() === newAssignmentName.trim().toLowerCase() &&
+        a.id !== existingAssignment?.id,
+    );
+    if (nameExists) {
       return showToast(
         "An assignment with this name already exists in the selected chapter.",
         "error",
@@ -72,10 +116,10 @@ export default function VirtualAssignmentModal({
             }))
           : handles;
 
+      // 1. Fetch matching questions (Reads isolated to targeted assignments)
       for (const target of targets) {
         if (!target.chapterId || !target.assignmentId) continue;
 
-        // Fetch just the targeted assignment's questions to find matches
         const qSnap = await getDocs(
           collection(
             db,
@@ -117,30 +161,63 @@ export default function VirtualAssignmentModal({
         );
       }
 
-      await addDoc(
-        collection(
-          db,
-          "users",
-          auth.currentUser.uid,
-          "chapters",
-          targetChapterId,
-          "assignments",
-        ),
-        {
-          name: newAssignmentName.trim(),
-          isVirtual: true,
-          refs: collectedRefs,
+      // 2. Build the payload including the config state
+      const configToSave = {
+        mode: configMode,
+        common: {
+          numbers: commonNumbers,
+          colors: commonColors,
+          assignments: commonAssignments,
         },
-      );
+        handles: handles,
+      };
 
-      showToast(
-        `Created Filtered View with ${collectedRefs.length} questions!`,
-      );
+      const payload = {
+        name: newAssignmentName.trim(),
+        isVirtual: true,
+        refs: collectedRefs,
+        config: configToSave, // <-- Preserving conditions
+      };
+
+      // 3. Update or Add
+      if (isEditing) {
+        await updateDoc(
+          doc(
+            db,
+            "users",
+            auth.currentUser.uid,
+            "chapters",
+            targetChapterId,
+            "assignments",
+            existingAssignment.id,
+          ),
+          payload,
+        );
+        showToast(
+          `Updated View! Now showing ${collectedRefs.length} questions.`,
+        );
+      } else {
+        await addDoc(
+          collection(
+            db,
+            "users",
+            auth.currentUser.uid,
+            "chapters",
+            targetChapterId,
+            "assignments",
+          ),
+          payload,
+        );
+        showToast(
+          `Created Filtered View with ${collectedRefs.length} questions!`,
+        );
+      }
+
       onSuccess();
       onClose();
     } catch (e) {
       console.error(e);
-      showToast("Failed to create view", "error");
+      showToast("Failed to save view", "error");
     } finally {
       setIsSaving(false);
     }
@@ -182,8 +259,7 @@ export default function VirtualAssignmentModal({
         style={{ width: "500px", maxHeight: "90vh", overflowY: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h4>Create Filtered View</h4>
-
+        <h4>{isEditing ? "Update Filtered View" : "Create Filtered View"}</h4>
         <div style={{ marginBottom: 15, display: "flex", gap: "5px" }}>
           <label>View Name</label>
           <input
@@ -202,17 +278,21 @@ export default function VirtualAssignmentModal({
             className="form-control"
             value={targetChapterId}
             onChange={(e) => setTargetChapterId(e.target.value)}
+            disabled={isEditing}
             style={{ padding: "5px" }}
           >
-            <option value="" style={{ padding: "5px" }}>
-              Select Chapter
-            </option>
+            <option value="">Select Chapter</option>
             {chapters.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
           </select>
+          {isEditing && (
+            <small style={{ color: "#888" }}>
+              Chapter cannot be changed while updating.
+            </small>
+          )}
         </div>
 
         <div style={{ display: "flex", gap: 10, marginBottom: 15 }}>
@@ -413,7 +493,7 @@ export default function VirtualAssignmentModal({
             onClick={handleSave}
             disabled={isSaving}
           >
-            {isSaving ? "Creating..." : "Create View"}
+            {isSaving ? "Saving..." : isEditing ? "Update View" : "Create View"}
           </button>
         </div>
       </div>

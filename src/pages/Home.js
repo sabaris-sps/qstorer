@@ -100,6 +100,7 @@ export default function Home() {
 
   // Virtual View Modal
   const [showVirtualModal, setShowVirtualModal] = useState(false);
+  const [virtualModalEditData, setVirtualModalData] = useState(null);
 
   // require login
   useEffect(() => {
@@ -176,19 +177,26 @@ export default function Home() {
         ),
       );
       const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setAssignments(arr.sort((a, b) => a.name.localeCompare(b.name)));
-      // reset assignment selection if removed
-      if (!arr.find((a) => a.id === selectedAssignment))
+      const sorted = arr.sort((a, b) => a.name.localeCompare(b.name));
+      setAssignments(sorted);
+
+      if (!sorted.find((a) => a.id === selectedAssignment))
         setSelectedAssignment("");
+
+      return sorted;
     } catch (e) {
       console.error(e);
     }
   }
 
-  async function loadQuestions() {
+  async function loadQuestions(freshAssignments = null) {
     try {
       const uid = auth.currentUser.uid;
-      const currentAsg = assignments.find((a) => a.id === selectedAssignment);
+
+      const sourceAssignments = freshAssignments || assignments;
+      const currentAsg = sourceAssignments.find(
+        (a) => a.id === selectedAssignment,
+      );
 
       if (currentAsg?.isVirtual) {
         // Fetch all referenced documents parallelly
@@ -211,8 +219,8 @@ export default function Home() {
             return {
               ...dSnap.data(),
               id: dSnap.id,
-              number: index + 1, // Override visual number
-              originalPath: ref, // Inject tracking path
+              number: index + 1,
+              originalPath: ref,
             };
           }
           return null;
@@ -220,11 +228,13 @@ export default function Home() {
 
         const arr = (await Promise.all(promises)).filter(Boolean);
         setQuestions(arr);
-        if (arr.length > 0)
+        if (arr.length > 0) {
           setActiveQuestionId((prev) =>
             prev && arr.find((q) => q.id === prev) ? prev : arr[0].id,
           );
-        else setActiveQuestionId(null);
+        } else {
+          setActiveQuestionId(null);
+        }
       } else {
         // Normal fetch
         const q = query(
@@ -248,7 +258,7 @@ export default function Home() {
             chapterId: selectedChapter,
             assignmentId: selectedAssignment,
             questionId: d.id,
-          }, // Inject normal tracking path
+          },
         }));
         setQuestions(arr);
         if (arr.length > 0)
@@ -545,6 +555,12 @@ export default function Home() {
           ),
           { refs: newRefs },
         );
+
+        //Load fresh data to instantly update sidebar
+        const freshAsgs = await loadAssignments();
+        await loadQuestions(freshAsgs);
+      } else {
+        await loadQuestions();
       }
 
       showToast("Question deleted");
@@ -1184,12 +1200,22 @@ export default function Home() {
 
       <VirtualAssignmentModal
         isOpen={showVirtualModal}
-        onClose={() => setShowVirtualModal(false)}
+        onClose={() => {
+          setShowVirtualModal(false);
+          setVirtualModalData(null);
+        }}
         chapters={chapters}
         assignmentsByChapter={assignmentsByChapter}
         loadAssignmentsForAllChapters={loadAssignmentsForAllChapters}
         showToast={showToast}
-        onSuccess={loadAssignments}
+        onSuccess={async () => {
+          const freshAsgs = await loadAssignments();
+          if (selectedAssignment) {
+            await loadQuestions(freshAsgs);
+          }
+        }}
+        existingAssignment={virtualModalEditData}
+        currentChapterId={selectedChapter}
       />
 
       <Sidebar
@@ -1230,7 +1256,14 @@ export default function Home() {
           handleDeleteChapter={handleDeleteChapter}
           questions={visibleQuestions}
           isVirtual={isCurrentlyVirtual}
-          onCreateVirtual={() => setShowVirtualModal(true)}
+          onCreateVirtual={() => {
+            setVirtualModalData(null);
+            setShowVirtualModal(true);
+          }}
+          onEditVirtual={() => {
+            setVirtualModalData(currentAsgObj);
+            setShowVirtualModal(true);
+          }}
         />
 
         {!selectedChapter || !selectedAssignment ? (
