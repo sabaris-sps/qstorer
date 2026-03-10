@@ -98,10 +98,10 @@ export default function SelectionBar({
           {!isVirtual && (
             <button
               className="btn-outline-primary btn-sm"
-              onClick={onEditVirtual}
-              style={{ marginLeft: 8 }}
+              onClick={onCreateVirtual}
+              title="Create a filtered cross-assignment view"
             >
-              Update View
+              New View
             </button>
           )}
           {isVirtual && (
