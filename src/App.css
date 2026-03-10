@@ -890,6 +890,24 @@ input:checked+.slider:before {
   outline: none;
 }
 
+
+/* ===================================== */
+/* Global Image Inversion                */
+/* ===================================== */
+
+/* Invert image colours */
+.invert-img-colors {
+  filter: invert(1);
+}
+
+body.invert-all-images img {
+  filter: invert(1) !important;
+}
+
+body.invert-all-images .PhotoView-Photo {
+  filter: invert(1) !important;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

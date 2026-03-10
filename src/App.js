@@ -1,4 +1,4 @@
-// src/App.js
+// src/App.jsx
 import React, { useEffect, useState, createContext } from "react";
 import { Routes, Route, Link, useNavigate } from "react-router-dom";
 import Home from "./pages/Home";
@@ -19,6 +19,12 @@ export default function App() {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
+  // Initialize from localStorage (defaults to false)
+  const [invertImages, setInvertImages] = useState(() => {
+    const saved = localStorage.getItem("invertImages");
+    return saved === "true";
+  });
+
   // auth listener
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -28,6 +34,16 @@ export default function App() {
     });
     return () => unsub();
   }, []);
+
+  // Sync invertImages with localStorage and update body class
+  useEffect(() => {
+    localStorage.setItem("invertImages", invertImages);
+    if (invertImages) {
+      document.body.classList.add("invert-all-images");
+    } else {
+      document.body.classList.remove("invert-all-images");
+    }
+  }, [invertImages]);
 
   async function reloadChapters() {
     // Chapters are loaded in Home and other pages (using user context)
@@ -49,6 +65,8 @@ export default function App() {
         selectedAssignment,
         setSelectedAssignment,
         user,
+        invertImages, // Exported in case you need it in other components later
+        setInvertImages,
       }}
     >
       <div className="app-root">
@@ -58,7 +76,8 @@ export default function App() {
               QStorer
             </Link>
           </div>
-          <nav className="toplinks">
+          {/* Added align-items: center so the toggle sits perfectly centered */}
+          <nav className="toplinks" style={{ alignItems: "center" }}>
             {!user ? (
               <>
                 <Link to="/login" className="toplink">
@@ -70,6 +89,35 @@ export default function App() {
               </>
             ) : (
               <>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginRight: "12px",
+                  }}
+                >
+                  <label
+                    htmlFor="invert-toggle"
+                    style={{
+                      fontSize: "0.85rem",
+                      cursor: "pointer",
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    Invert Images
+                  </label>
+                  <label className="switch" style={{ margin: 0 }}>
+                    <input
+                      id="invert-toggle"
+                      type="checkbox"
+                      checked={invertImages}
+                      onChange={(e) => setInvertImages(e.target.checked)}
+                    />
+                    <span className="slider"></span>
+                  </label>
+                </div>
+
                 <Link to="/create-chapter" className="toplink">
                   Create Chapter
                 </Link>
