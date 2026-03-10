@@ -282,11 +282,18 @@ export default function VirtualAssignmentModal({
             style={{ padding: "5px" }}
           >
             <option value="">Select Chapter</option>
-            {chapters.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+            {chapters
+              .sort((a, b) =>
+                a.name.localeCompare(b.name, undefined, {
+                  numeric: true,
+                  sensitivity: "base",
+                }),
+              )
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
           </select>
           {isEditing && (
             <small style={{ color: "#888" }}>
@@ -341,11 +348,18 @@ export default function VirtualAssignmentModal({
                   }}
                 >
                   <option value="">Chap</option>
-                  {chapters.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
+                  {chapters
+                    .sort((a, b) =>
+                      a.name.localeCompare(b.name, undefined, {
+                        numeric: true,
+                        sensitivity: "base",
+                      }),
+                    )
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
                 </select>
                 <select
                   value={ca.assignmentId}
@@ -357,6 +371,12 @@ export default function VirtualAssignmentModal({
                 >
                   <option value="">Asgn</option>
                   {(assignmentsByChapter[ca.chapterId] || [])
+                    .sort((a, b) =>
+                      a.name.localeCompare(b.name, undefined, {
+                        numeric: true,
+                        sensitivity: "base",
+                      }),
+                    )
                     .filter((a) => !a.isVirtual)
                     .map((a) => (
                       <option key={a.id} value={a.id}>
@@ -412,11 +432,18 @@ export default function VirtualAssignmentModal({
                     }}
                   >
                     <option value="">Chap</option>
-                    {chapters.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
+                    {chapters
+                      .sort((a, b) =>
+                        a.name.localeCompare(b.name, undefined, {
+                          numeric: true,
+                          sensitivity: "base",
+                        }),
+                      )
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
                   </select>
                   <select
                     value={h.assignmentId}
@@ -428,6 +455,12 @@ export default function VirtualAssignmentModal({
                   >
                     <option value="">Asgn</option>
                     {(assignmentsByChapter[h.chapterId] || [])
+                      .sort((a, b) =>
+                        a.name.localeCompare(b.name, undefined, {
+                          numeric: true,
+                          sensitivity: "base",
+                        }),
+                      )
                       .filter((a) => !a.isVirtual)
                       .map((a) => (
                         <option key={a.id} value={a.id}>

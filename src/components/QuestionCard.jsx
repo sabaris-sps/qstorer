@@ -241,11 +241,18 @@ export default function QuestionCard({
                   }}
                 >
                   <option value="">Select chapter</option>
-                  {chapters.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
+                  {chapters
+                    .sort((a, b) =>
+                      a.name.localeCompare(b.name, undefined, {
+                        numeric: true,
+                        sensitivity: "base",
+                      }),
+                    )
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
                 </select>
 
                 <select
@@ -253,11 +260,18 @@ export default function QuestionCard({
                   onChange={(e) => setMoveTargetAssignment(e.target.value)}
                 >
                   <option value="">Select assignment</option>
-                  {(assignmentsByChapter[moveTargetChapter] || []).map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
+                  {(assignmentsByChapter[moveTargetChapter] || [])
+                    .sort((a, b) =>
+                      a.name.localeCompare(b.name, undefined, {
+                        numeric: true,
+                        sensitivity: "base",
+                      }),
+                    )
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
                 </select>
               </div>
 

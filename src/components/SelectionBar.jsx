@@ -71,11 +71,18 @@ export default function SelectionBar({
             onChange={(e) => setSelectedChapter(e.target.value)}
           >
             <option value="">Select Chapter</option>
-            {chapters.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+            {chapters
+              .sort((a, b) =>
+                a.name.localeCompare(b.name, undefined, {
+                  numeric: true,
+                  sensitivity: "base",
+                }),
+              )
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
           </select>
         </div>
 
@@ -86,11 +93,18 @@ export default function SelectionBar({
             onChange={(e) => setSelectedAssignment(e.target.value)}
           >
             <option value="">Select Assignment</option>
-            {assignments.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
+            {assignments
+              .sort((a, b) =>
+                a.name.localeCompare(b.name, undefined, {
+                  numeric: true,
+                  sensitivity: "base",
+                }),
+              )
+              .map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
           </select>
         </div>
 

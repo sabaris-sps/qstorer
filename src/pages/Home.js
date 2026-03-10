@@ -156,7 +156,14 @@ export default function Home() {
       const uid = auth.currentUser.uid;
       const snap = await getDocs(collection(db, "users", uid, "chapters"));
       const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setChapters(arr.sort((a, b) => a.name.localeCompare(b.name)));
+      setChapters(
+        arr.sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, {
+            numeric: true,
+            sensitivity: "base",
+          }),
+        ),
+      );
     } catch (e) {
       console.error(e);
       showToast("Failed to load chapters", "error");
@@ -177,7 +184,12 @@ export default function Home() {
         ),
       );
       const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      const sorted = arr.sort((a, b) => a.name.localeCompare(b.name));
+      const sorted = arr.sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }),
+      );
       setAssignments(sorted);
 
       if (!sorted.find((a) => a.id === selectedAssignment))

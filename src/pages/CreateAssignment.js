@@ -16,7 +16,7 @@ export default function CreateAssignment() {
     const uid = auth.currentUser.uid;
     await addDoc(
       collection(db, "users", uid, "chapters", chapterId, "assignments"),
-      { name }
+      { name },
     );
     setName("");
     nav("/");
@@ -27,11 +27,18 @@ export default function CreateAssignment() {
       <h2>Create Assignment</h2>
       <select value={chapterId} onChange={(e) => setChapterId(e.target.value)}>
         <option value="">Select chapter</option>
-        {chapters.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
+        {chapters
+          .sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, {
+              numeric: true,
+              sensitivity: "base",
+            }),
+          )
+          .map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
       </select>
 
       <input
