@@ -49,6 +49,7 @@ export default function QuestionCard({
   handleUpdateColor,
   isCopyMode,
   setIsCopyMode,
+  isVirtual,
 }) {
   const [showColorTray, setShowColorTray] = useState(false);
 
@@ -126,13 +127,15 @@ export default function QuestionCard({
           </button>
 
           {/* MOVE BUTTON triggers popup */}
-          <button
-            className="btn-outline-primary btn-sm"
-            onClick={openMoveUI}
-            style={{ marginLeft: 8 }}
-          >
-            Move/Copy
-          </button>
+          {!isVirtual && (
+            <button
+              className="btn-outline-primary btn-sm"
+              onClick={openMoveUI}
+              style={{ marginLeft: 8 }}
+            >
+              Move/Copy
+            </button>
+          )}
         </div>
       </div>
 

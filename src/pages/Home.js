@@ -3,6 +3,7 @@ import { AppContext } from "../App";
 import {
   collection,
   getDocs,
+  getDoc,
   query,
   orderBy,
   addDoc,
@@ -23,8 +24,9 @@ import EditNamesModal from "../components/EditNamesModal";
 import CreateQuestion from "../components/CreateQuestion";
 import QuestionCard from "../components/QuestionCard";
 import SelectionBar from "../components/SelectionBar";
-import { sanitizePublicId } from "../utils";
+import { sanitizePublicId, parseNumberList } from "../utils";
 import FilterModal from "../components/FilterModal";
+import VirtualAssignmentModal from "../components/VirtualAssignmentModal";
 
 /* Toast component */
 function Toast({ toast }) {
@@ -34,28 +36,6 @@ function Toast({ toast }) {
       {toast.message}
     </div>
   );
-}
-
-function parseNumberList(input) {
-  if (!input || !input.trim()) return [];
-  const nums = new Set();
-  input.split(",").forEach((part) => {
-    const trimmed = part.trim();
-    if (!trimmed) return;
-    const rangeMatch = trimmed.match(/^(\d+)\s*-\s*(\d+)$/);
-    if (rangeMatch) {
-      let start = Number(rangeMatch[1]);
-      let end = Number(rangeMatch[2]);
-      if (!Number.isInteger(start) || !Number.isInteger(end)) return;
-      if (start <= 0 || end <= 0) return;
-      if (end < start) [start, end] = [end, start];
-      for (let n = start; n <= end; n++) nums.add(n);
-      return;
-    }
-    const n = Number(trimmed);
-    if (Number.isInteger(n) && n > 0) nums.add(n);
-  });
-  return Array.from(nums);
 }
 
 export default function Home() {
@@ -117,6 +97,9 @@ export default function Home() {
     numberText: "",
     colors: [],
   });
+
+  // Virtual View Modal
+  const [showVirtualModal, setShowVirtualModal] = useState(false);
 
   // require login
   useEffect(() => {
@@ -205,28 +188,74 @@ export default function Home() {
   async function loadQuestions() {
     try {
       const uid = auth.currentUser.uid;
-      const q = query(
-        collection(
-          db,
-          "users",
-          uid,
-          "chapters",
-          selectedChapter,
-          "assignments",
-          selectedAssignment,
-          "questions",
-        ),
-        orderBy("number", "asc"),
-      );
-      const snap = await getDocs(q);
-      const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setQuestions(arr);
-      if (arr.length > 0) {
-        setActiveQuestionId((prev) =>
-          prev >= arr.length ? arr[0].id || null : prev,
-        );
+      const currentAsg = assignments.find((a) => a.id === selectedAssignment);
+
+      if (currentAsg?.isVirtual) {
+        // Fetch all referenced documents parallelly
+        const refs = currentAsg.refs || [];
+        const promises = refs.map(async (ref, index) => {
+          const dSnap = await getDoc(
+            doc(
+              db,
+              "users",
+              uid,
+              "chapters",
+              ref.chapterId,
+              "assignments",
+              ref.assignmentId,
+              "questions",
+              ref.questionId,
+            ),
+          );
+          if (dSnap.exists()) {
+            return {
+              ...dSnap.data(),
+              id: dSnap.id,
+              number: index + 1, // Override visual number
+              originalPath: ref, // Inject tracking path
+            };
+          }
+          return null;
+        });
+
+        const arr = (await Promise.all(promises)).filter(Boolean);
+        setQuestions(arr);
+        if (arr.length > 0)
+          setActiveQuestionId((prev) =>
+            prev && arr.find((q) => q.id === prev) ? prev : arr[0].id,
+          );
+        else setActiveQuestionId(null);
       } else {
-        setActiveQuestionId(null);
+        // Normal fetch
+        const q = query(
+          collection(
+            db,
+            "users",
+            uid,
+            "chapters",
+            selectedChapter,
+            "assignments",
+            selectedAssignment,
+            "questions",
+          ),
+          orderBy("number", "asc"),
+        );
+        const snap = await getDocs(q);
+        const arr = snap.docs.map((d) => ({
+          ...d.data(),
+          id: d.id,
+          originalPath: {
+            chapterId: selectedChapter,
+            assignmentId: selectedAssignment,
+            questionId: d.id,
+          }, // Inject normal tracking path
+        }));
+        setQuestions(arr);
+        if (arr.length > 0)
+          setActiveQuestionId((prev) =>
+            prev && arr.find((q) => q.id === prev) ? prev : arr[0].id,
+          );
+        else setActiveQuestionId(null);
       }
       setMode("view");
       setNoteEdit("");
@@ -238,6 +267,9 @@ export default function Home() {
   // create question (Modified for Bulk Mode)
   async function handleCreateQuestion(e, bulkFiles = null, isBulk = false) {
     e.preventDefault();
+    const currentAsg = assignments.find((a) => a.id === selectedAssignment);
+    if (currentAsg?.isVirtual)
+      return showToast("Cannot create directly in a virtual view", "error");
 
     // 1. Validation
     if (!isBulk && !newNoteText.trim() && newFiles.length === 0) {
@@ -368,16 +400,19 @@ export default function Home() {
     try {
       setSaveNoteBtn(false);
       const uid = auth.currentUser.uid;
+      const q = questions.find((qu) => qu.id === activeQuestionId);
+      const { chapterId, assignmentId, questionId } = q.originalPath;
+
       const dref = doc(
         db,
         "users",
         uid,
         "chapters",
-        selectedChapter,
+        chapterId,
         "assignments",
-        selectedAssignment,
+        assignmentId,
         "questions",
-        activeQuestionId,
+        questionId,
       );
       await updateDoc(dref, { note: noteEdit });
       setSaveNoteBtn(true);
@@ -396,26 +431,12 @@ export default function Home() {
     try {
       setUploadImagesBtn(false);
       const uid = auth.currentUser.uid;
-
-      // fetch names
-      const chapSnap = await getDocs(collection(db, "users", uid, "chapters"));
-      const chapName =
-        chapSnap.docs.find((d) => d.id === selectedChapter)?.data()?.name ||
-        "chapter";
-      const asgSnap = await getDocs(
-        collection(
-          db,
-          "users",
-          uid,
-          "chapters",
-          selectedChapter,
-          "assignments",
-        ),
-      );
-      const asgName =
-        asgSnap.docs.find((d) => d.id === selectedAssignment)?.data()?.name ||
-        "assignment";
       const qObj = questions.find((q) => q.id === activeQuestionId);
+      const { chapterId, assignmentId, questionId } = qObj.originalPath;
+
+      const chapName =
+        chapters.find((c) => c.id === chapterId)?.name || "chapter";
+      const asgName = "assignment";
       const qNum = qObj?.number || 0;
 
       const urls = [];
@@ -430,11 +451,11 @@ export default function Home() {
         "users",
         uid,
         "chapters",
-        selectedChapter,
+        chapterId,
         "assignments",
-        selectedAssignment,
+        assignmentId,
         "questions",
-        activeQuestionId,
+        questionId,
       );
       await updateDoc(dref, { images: arrayUnion(...urls) });
 
@@ -451,9 +472,17 @@ export default function Home() {
 
   // delete a question and renumber remaining
   async function handleDeleteQuestion(qid) {
-    if (!window.confirm("Delete this question?")) return;
+    if (
+      !window.confirm(
+        "Delete this question? (If this is a filtered view, it deletes the ORIGINAL question everywhere!)",
+      )
+    )
+      return;
     try {
-      (activeQuestion.images || []).map(async (img_url, i) => {
+      const q = questions.find((qu) => qu.id === qid);
+      const { chapterId, assignmentId, questionId } = q.originalPath;
+
+      (q.images || []).map(async (img_url) => {
         const public_id = img_url.split("/").pop().split(".")[0];
         await deleteFromCloudinary(public_id);
       });
@@ -465,15 +494,15 @@ export default function Home() {
           "users",
           uid,
           "chapters",
-          selectedChapter,
+          chapterId,
           "assignments",
-          selectedAssignment,
+          assignmentId,
           "questions",
-          qid,
+          questionId,
         ),
       );
 
-      // re-number remaining questions
+      // Re-number original collection
       const qSnap = await getDocs(
         query(
           collection(
@@ -481,9 +510,9 @@ export default function Home() {
             "users",
             uid,
             "chapters",
-            selectedChapter,
+            chapterId,
             "assignments",
-            selectedAssignment,
+            assignmentId,
             "questions",
           ),
           orderBy("number", "asc"),
@@ -498,6 +527,26 @@ export default function Home() {
         }
       }
 
+      // If we are currently IN a virtual assignment, remove the dead ref to clean it up
+      const currentAsg = assignments.find((a) => a.id === selectedAssignment);
+      if (currentAsg?.isVirtual) {
+        const newRefs = (currentAsg.refs || []).filter(
+          (r) => r.questionId !== questionId,
+        );
+        await updateDoc(
+          doc(
+            db,
+            "users",
+            uid,
+            "chapters",
+            selectedChapter,
+            "assignments",
+            selectedAssignment,
+          ),
+          { refs: newRefs },
+        );
+      }
+
       showToast("Question deleted");
       await loadQuestions();
     } catch (e) {
@@ -508,48 +557,77 @@ export default function Home() {
 
   // delete assignment: delete all its questions then delete assignment doc
   async function handleDeleteAssignment(assignId) {
-    if (!window.confirm("Delete this assignment and all its questions?"))
-      return;
-    try {
-      const uid = auth.currentUser.uid;
-
-      // delete questions
-      const qSnap = await getDocs(
-        collection(
-          db,
-          "users",
-          uid,
-          "chapters",
-          selectedChapter,
-          "assignments",
-          assignId,
-          "questions",
-        ),
-      );
-      for (const d of qSnap.docs) {
-        await deleteDoc(d.ref);
+    const asg = assignments.find((a) => a.id === assignId);
+    if (asg?.isVirtual) {
+      if (
+        !window.confirm(
+          "Delete this filtered view? (Original questions will NOT be deleted)",
+        )
+      )
+        return;
+      try {
+        await deleteDoc(
+          doc(
+            db,
+            "users",
+            auth.currentUser.uid,
+            "chapters",
+            selectedChapter,
+            "assignments",
+            assignId,
+          ),
+        );
+        showToast("Filtered View deleted");
+        await loadAssignments();
+        setSelectedAssignment("");
+        setQuestions([]);
+      } catch (e) {
+        showToast("Delete failed", "error");
       }
+    } else {
+      if (!window.confirm("Delete this assignment and all its questions?"))
+        return;
+      try {
+        const uid = auth.currentUser.uid;
 
-      // delete assignment doc
-      await deleteDoc(
-        doc(
-          db,
-          "users",
-          uid,
-          "chapters",
-          selectedChapter,
-          "assignments",
-          assignId,
-        ),
-      );
+        // delete questions
+        const qSnap = await getDocs(
+          collection(
+            db,
+            "users",
+            uid,
+            "chapters",
+            selectedChapter,
+            "assignments",
+            assignId,
+            "questions",
+          ),
+        );
+        for (const d of qSnap.docs) {
+          await deleteDoc(d.ref);
+        }
 
-      showToast("Assignment deleted");
-      await loadAssignments();
-      setSelectedAssignment("");
-      setQuestions([]);
-    } catch (e) {
-      console.error(e);
-      showToast("Delete failed", "error");
+        // delete assignment doc
+        await deleteDoc(
+          doc(
+            db,
+            "users",
+            uid,
+            "chapters",
+            selectedChapter,
+            "assignments",
+            assignId,
+          ),
+        );
+
+        showToast("Assignment deleted");
+        await loadAssignments();
+        setSelectedAssignment("");
+        setQuestions([]);
+      } catch (e) {
+        console.error(e);
+        showToast("Delete failed", "error");
+      }
     }
   }
 
@@ -600,38 +678,39 @@ export default function Home() {
 
   async function handleDeleteImage() {
     const index = photoIndex;
-    if (!window.confirm(`Delete this image (image number: ${index + 1}?`))
-      return;
+    if (!window.confirm(`Delete this image (number: ${index + 1})?`)) return;
     try {
       const img_url = activeQuestion.images[index];
       const public_id = img_url.split("/").pop().split(".")[0];
       await deleteFromCloudinary(public_id);
 
       const uid = auth.currentUser.uid;
+      const q = questions.find((qu) => qu.id === activeQuestionId);
+      const { chapterId, assignmentId, questionId } = q.originalPath;
+
       const dref = doc(
         db,
         "users",
         uid,
         "chapters",
-        selectedChapter,
+        chapterId,
         "assignments",
-        selectedAssignment,
+        assignmentId,
         "questions",
-        activeQuestionId,
+        questionId,
       );
-
       await updateDoc(dref, { images: arrayRemove(img_url) });
+
       await loadQuestions();
       setPhotoViewerVisible(false);
     } catch (error) {
-      console.error("error deleting image", error);
+      console.error("error deleting", error);
     }
   }
 
   async function handleUpdateColor(colorHex) {
     if (!activeQuestionId) return;
 
-    // Optimistic UI Update (makes it feel instant)
     setQuestions((prev) =>
       prev.map((q) =>
         q.id === activeQuestionId ? { ...q, color: colorHex } : q,
@@ -640,20 +719,22 @@ export default function Home() {
 
     try {
       const uid = auth.currentUser.uid;
+      const q = questions.find((qu) => qu.id === activeQuestionId);
+      const { chapterId, assignmentId, questionId } = q.originalPath;
+
       const dref = doc(
         db,
         "users",
         uid,
         "chapters",
-        selectedChapter,
+        chapterId,
         "assignments",
-        selectedAssignment,
+        assignmentId,
         "questions",
-        activeQuestionId,
+        questionId,
       );
       await updateDoc(dref, { color: colorHex });
     } catch (e) {
-      console.error("Failed to save color", e);
       showToast("Failed to save color", "error");
     }
   }
@@ -1069,13 +1150,10 @@ export default function Home() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    photoViewerVisible,
-    activeQuestion,
-    activeQuestionId,
-    visibleQuestions,
-    handleSelectQuestion,
-  ]);
+  }, [photoViewerVisible, activeQuestion, activeQuestionId, visibleQuestions]);
+
+  const currentAsgObj = assignments.find((a) => a.id === selectedAssignment);
+  const isCurrentlyVirtual = currentAsgObj?.isVirtual || false;
 
   return (
     <div className="home-grid">
@@ -1104,6 +1182,16 @@ export default function Home() {
         onApply={setFilterConfig}
       />
 
+      <VirtualAssignmentModal
+        isOpen={showVirtualModal}
+        onClose={() => setShowVirtualModal(false)}
+        chapters={chapters}
+        assignmentsByChapter={assignmentsByChapter}
+        loadAssignmentsForAllChapters={loadAssignmentsForAllChapters}
+        showToast={showToast}
+        onSuccess={loadAssignments}
+      />
+
       <Sidebar
         questions={visibleQuestions}
         activeQuestionId={activeQuestionId}
@@ -1117,6 +1205,7 @@ export default function Home() {
         isFilterActive={
           filterConfig.numberText || filterConfig.colors.length > 0
         }
+        isVirtual={isCurrentlyVirtual}
       />
 
       {/* main panel */}
@@ -1140,6 +1229,8 @@ export default function Home() {
           handleDeleteAssignment={handleDeleteAssignment}
           handleDeleteChapter={handleDeleteChapter}
           questions={visibleQuestions}
+          isVirtual={isCurrentlyVirtual}
+          onCreateVirtual={() => setShowVirtualModal(true)}
         />
 
         {!selectedChapter || !selectedAssignment ? (
@@ -1200,6 +1291,7 @@ export default function Home() {
             handleUpdateColor={handleUpdateColor}
             isCopyMode={isCopyMode}
             setIsCopyMode={setIsCopyMode}
+            isVirtual={isCurrentlyVirtual}
           />
         ) : (
           <div className="placeholder">Select a question number</div>

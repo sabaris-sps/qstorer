@@ -9,6 +9,7 @@ export default function Sidebar({
   onOpenFilter,
   canFilter,
   isFilterActive,
+  isVirtual,
 }) {
   return (
     <aside className="left-panel">
@@ -71,7 +72,7 @@ export default function Sidebar({
             )}
           </button>
         ))}
-        {selectedChapter && selectedAssignment && (
+        {selectedChapter && selectedAssignment && !isVirtual && (
           <button
             className="num-btn plus"
             onClick={() => {

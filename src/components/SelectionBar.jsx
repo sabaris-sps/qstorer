@@ -21,6 +21,7 @@ export default function SelectionBar({
   handleDeleteAssignment,
   handleDeleteChapter,
   questions,
+  onCreateVirtual,
 }) {
   const [showExportModal, setShowExportModal] = useState(false);
 
@@ -92,6 +93,13 @@ export default function SelectionBar({
         </div>
 
         <div className="sel-actions">
+          <button
+            className="btn-outline-primary btn-sm"
+            onClick={onCreateVirtual}
+            title="Create a filtered cross-assignment view"
+          >
+            New View
+          </button>
           <button
             className="btn-outline-secondary btn-sm"
             onClick={() => {

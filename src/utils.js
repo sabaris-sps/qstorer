@@ -1,6 +1,28 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import download from "downloadjs";
 
+export function parseNumberList(input) {
+  if (!input || !input.trim()) return [];
+  const nums = new Set();
+  input.split(",").forEach((part) => {
+    const trimmed = part.trim();
+    if (!trimmed) return;
+    const rangeMatch = trimmed.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (rangeMatch) {
+      let start = Number(rangeMatch[1]);
+      let end = Number(rangeMatch[2]);
+      if (!Number.isInteger(start) || !Number.isInteger(end)) return;
+      if (start <= 0 || end <= 0) return;
+      if (end < start) [start, end] = [end, start];
+      for (let n = start; n <= end; n++) nums.add(n);
+      return;
+    }
+    const n = Number(trimmed);
+    if (Number.isInteger(n) && n > 0) nums.add(n);
+  });
+  return Array.from(nums);
+}
+
 export function sanitizePublicId(name) {
   if (!name) return "";
   return name
