@@ -64,12 +64,46 @@ export default function QuestionCard({
     loadAssignmentsForAllChapters();
     if (setIsCopyMode) setIsCopyMode(false); // Reset on open
   }
+
+  let sourceChapterName = "Unknown Chapter";
+  let sourceAssignmentName = "Unknown Assignment";
+
+  if (isVirtual && activeQuestion?.originalPath) {
+    const { chapterId, assignmentId } = activeQuestion.originalPath;
+
+    // Find chapter name
+    const sourceChap = chapters?.find((c) => c.id === chapterId);
+    if (sourceChap) sourceChapterName = sourceChap.name;
+
+    // Find assignment name using assignmentsByChapter
+    const sourceAssigns = assignmentsByChapter?.[chapterId] || [];
+    const sourceAsg = sourceAssigns.find((a) => a.id === assignmentId);
+    if (sourceAsg) sourceAssignmentName = sourceAsg.name;
+  }
+
   return (
     <div className="question-card">
       <div className="qhead">
-        <h3>Question {activeQuestion.number}</h3>
+        <h3>
+          Question {activeQuestion.number}
+          {isVirtual && (
+            <span
+              style={{
+                fontSize: "0.85rem",
+                fontWeight: "normal",
+                color: "var(--text-secondary)",
+                backgroundColor: "var(--bg-light)",
+                padding: "2px 8px",
+                borderRadius: "12px",
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              {`(${sourceChapterName} > ${sourceAssignmentName})`}
+            </span>
+          )}
+        </h3>
+
         <div style={{ display: "flex", alignItems: "center" }}>
-          {/* === COLOR PICKER (MOVED HERE) === */}
           <div className="color-tray-wrapper">
             {/* The Trigger Button */}
             <div
@@ -118,7 +152,6 @@ export default function QuestionCard({
               </div>
             )}
           </div>
-          {/* === END COLOR PICKER === */}
           <button
             className="btn-danger btn-sm"
             onClick={() => handleDeleteQuestion(activeQuestion.id)}
@@ -126,7 +159,6 @@ export default function QuestionCard({
             Delete Question
           </button>
 
-          {/* MOVE BUTTON triggers popup */}
           {!isVirtual && (
             <button
               className="btn-outline-primary btn-sm"
@@ -139,7 +171,6 @@ export default function QuestionCard({
         </div>
       </div>
 
-      {/* Move POPUP (modal) */}
       {moveOpen && (
         <div className="modal-backdrop" onClick={() => setMoveOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -400,6 +431,7 @@ export default function QuestionCard({
           </button>
         </div>
       )}
+
       <PhotoProvider
         key={activeQuestion.id}
         pullClosable={true}
