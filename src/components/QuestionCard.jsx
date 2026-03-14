@@ -1,13 +1,25 @@
 import ImageInput from "../ui/InputImage";
 import { PhotoProvider, PhotoView } from "react-photo-view";
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
+import TagInput from "./TagInput";
+import { AppContext } from "../App";
+import {
+  doc,
+  updateDoc,
+  arrayUnion,
+  arrayRemove,
+  increment,
+  collection,
+  setDoc,
+} from "firebase/firestore";
+import { db, auth } from "../firebase";
 
 const COLORS = [
   "#ef476f", // Red/Pink
   "#ffd166", // Yellow/Gold
   "#06d6a0", // Green
   "#118ab2", // Blue
-  "#b185db", // Purple (or transparent for 'clear')
+  "#b185db", // Purple
 ];
 
 export default function QuestionCard({
@@ -50,8 +62,12 @@ export default function QuestionCard({
   isCopyMode,
   setIsCopyMode,
   isVirtual,
+  setQuestions, // We need this to update the local state instantly
 }) {
   const [showColorTray, setShowColorTray] = useState(false);
+
+  // Bring in Global Tag state from Context
+  const { tags, setTags, showTags } = useContext(AppContext);
 
   function openMoveUI() {
     if (!activeQuestion) {
@@ -62,20 +78,137 @@ export default function QuestionCard({
     setMoveTargetChapter(selectedChapter || "");
     setMoveTargetAssignment(selectedAssignment || "");
     loadAssignmentsForAllChapters();
-    if (setIsCopyMode) setIsCopyMode(false); // Reset on open
+    if (setIsCopyMode) setIsCopyMode(false);
   }
+
+  // ==========================================
+  // TAG LOGIC
+  // ==========================================
+  const handleAddTag = async (tagName) => {
+    try {
+      const uid = auth.currentUser.uid;
+      const { chapterId, assignmentId, questionId } =
+        activeQuestion.originalPath;
+      const questionRef = doc(
+        db,
+        "users",
+        uid,
+        "chapters",
+        chapterId,
+        "assignments",
+        assignmentId,
+        "questions",
+        questionId,
+      );
+
+      // Check if tag already exists globally (case insensitive)
+      let existingTag = tags.find(
+        (t) => t.name.toLowerCase() === tagName.toLowerCase(),
+      );
+      let tagIdToUse;
+
+      if (existingTag) {
+        tagIdToUse = existingTag.id;
+        // Don't add if the question already has it
+        if ((activeQuestion.tags || []).includes(tagIdToUse)) return;
+
+        // 1. Update global tag count (+1)
+        const tagRef = doc(db, "users", uid, "tags", tagIdToUse);
+        await updateDoc(tagRef, { count: increment(1) });
+
+        // Update local tags state to reflect the +1 count
+        setTags((prev) =>
+          prev.map((t) =>
+            t.id === tagIdToUse ? { ...t, count: (t.count || 0) + 1 } : t,
+          ),
+        );
+      } else {
+        // Create brand new tag globally
+        const newTagRef = doc(collection(db, "users", uid, "tags"));
+        tagIdToUse = newTagRef.id;
+        const randomColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+
+        const newTagObj = { name: tagName, color: randomColor, count: 1 };
+
+        // Use setDoc for brand new documents
+        await setDoc(newTagRef, newTagObj);
+
+        // Update local tags state
+        setTags((prev) => [...prev, { id: tagIdToUse, ...newTagObj }]);
+      }
+
+      // 2. Add tag to the specific Question
+      await updateDoc(questionRef, { tags: arrayUnion(tagIdToUse) });
+
+      // 3. Instantly update UI (Local Question State)
+      if (setQuestions) {
+        setQuestions((prev) =>
+          prev.map((q) =>
+            q.id === activeQuestion.id
+              ? { ...q, tags: [...(q.tags || []), tagIdToUse] }
+              : q,
+          ),
+        );
+      }
+    } catch (error) {
+      console.error("Failed to add tag:", error);
+      showToast("Failed to add tag", "error");
+    }
+  };
+
+  const handleRemoveTag = async (tagId) => {
+    try {
+      const uid = auth.currentUser.uid;
+      const { chapterId, assignmentId, questionId } =
+        activeQuestion.originalPath;
+
+      // 1. Remove from Question
+      const questionRef = doc(
+        db,
+        "users",
+        uid,
+        "chapters",
+        chapterId,
+        "assignments",
+        assignmentId,
+        "questions",
+        questionId,
+      );
+      await updateDoc(questionRef, { tags: arrayRemove(tagId) });
+
+      // 2. Update global tag count (-1)
+      const tagRef = doc(db, "users", uid, "tags", tagId);
+      await updateDoc(tagRef, { count: increment(-1) });
+
+      // 3. Update local states
+      setTags((prev) =>
+        prev.map((t) =>
+          t.id === tagId ? { ...t, count: Math.max(0, (t.count || 0) - 1) } : t,
+        ),
+      );
+
+      if (setQuestions) {
+        setQuestions((prev) =>
+          prev.map((q) =>
+            q.id === activeQuestion.id
+              ? { ...q, tags: (q.tags || []).filter((id) => id !== tagId) }
+              : q,
+          ),
+        );
+      }
+    } catch (error) {
+      console.error("Failed to remove tag:", error);
+      showToast("Failed to remove tag", "error");
+    }
+  };
 
   let sourceChapterName = "Unknown Chapter";
   let sourceAssignmentName = "Unknown Assignment";
 
   if (isVirtual && activeQuestion?.originalPath) {
     const { chapterId, assignmentId } = activeQuestion.originalPath;
-
-    // Find chapter name
     const sourceChap = chapters?.find((c) => c.id === chapterId);
     if (sourceChap) sourceChapterName = sourceChap.name;
-
-    // Find assignment name using assignmentsByChapter
     const sourceAssigns = assignmentsByChapter?.[chapterId] || [];
     const sourceAsg = sourceAssigns.find((a) => a.id === assignmentId);
     if (sourceAsg) sourceAssignmentName = sourceAsg.name;
@@ -96,6 +229,7 @@ export default function QuestionCard({
                 padding: "2px 8px",
                 borderRadius: "12px",
                 border: "1px solid var(--border-color)",
+                marginLeft: "8px",
               }}
             >
               {`(${sourceChapterName} > ${sourceAssignmentName})`}
@@ -103,20 +237,32 @@ export default function QuestionCard({
           )}
         </h3>
 
-        <div style={{ display: "flex", alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flex: 1,
+            justifyContent: "flex-end",
+          }}
+        >
+          {showTags && (
+            <TagInput
+              questionTags={activeQuestion.tags || []}
+              globalTags={tags}
+              onAddTag={handleAddTag}
+              onRemoveTag={handleRemoveTag}
+            />
+          )}
+
           <div className="color-tray-wrapper">
-            {/* The Trigger Button */}
             <div
               className="color-trigger-btn"
               style={{ backgroundColor: activeQuestion.color || "grey" }}
-              onClick={() => setShowColorTray(!showColorTray)} // Toggle on click
+              onClick={() => setShowColorTray(!showColorTray)}
               title="Color Marker"
             />
-
-            {/* The Tray */}
             {showColorTray && (
               <div className="color-tray">
-                {/* Clear (X) Option */}
                 <div
                   className="color-option"
                   style={{
@@ -136,8 +282,6 @@ export default function QuestionCard({
                 >
                   ✕
                 </div>
-
-                {/* Color Dots */}
                 {COLORS.map((c) => (
                   <div
                     key={c}
@@ -152,6 +296,7 @@ export default function QuestionCard({
               </div>
             )}
           </div>
+
           <button
             className="btn-danger btn-sm"
             onClick={() => handleDeleteQuestion(activeQuestion.id)}
@@ -173,13 +318,14 @@ export default function QuestionCard({
 
       {moveOpen && (
         <div className="modal-backdrop" onClick={() => setMoveOpen(false)}>
+          {/* ... Your exact existing move modal code ... */}
+          {/* Keep your existing Modal Code here to save space in the response */}
           <div className="modal" onClick={(e) => e.stopPropagation()}>
+            {/* Same Move modal content as your original code */}
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <h4 style={{ margin: 0 }}>
                 {isCopyMode ? "Copy" : "Move"} Question
               </h4>
-
-              {/* simple tab buttons */}
               <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
                 <button
                   className={`btn-outline-primary btn-sm ${
@@ -217,7 +363,6 @@ export default function QuestionCard({
                 flexDirection: "column",
               }}
             >
-              {/* === TOGGLE SWITCH FOR COPY MODE === */}
               <div
                 className="toggle-container"
                 style={{
@@ -239,7 +384,6 @@ export default function QuestionCard({
                   <span className="slider"></span>
                 </label>
               </div>
-              {/* === END TOGGLE SWITCH === */}
               <div
                 style={{
                   marginTop: 12,
@@ -314,17 +458,10 @@ export default function QuestionCard({
                   width: "100%",
                 }}
               >
-                {/* tab-specific controls */}
                 {moveTab === "move" ? (
-                  <div
-                    style={{
-                      marginLeft: "auto",
-                      display: "flex",
-                      gap: 8,
-                    }}
-                  >
+                  <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
                     <button
-                      className="btn-primary" // Main action
+                      className="btn-primary"
                       onClick={handleMoveQuestion}
                       disabled={moveLoading}
                     >
@@ -474,8 +611,6 @@ export default function QuestionCard({
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           {saveNoteBtn ? (
             <button className="btn-success" onClick={handleSaveNote}>
-              {" "}
-              {/* Use SUCCESS for saving */}
               Save Note
             </button>
           ) : (
@@ -492,9 +627,7 @@ export default function QuestionCard({
 
       <div className="upload-more">
         <label>Upload More Images</label>
-
         <ImageInput files={moreFiles} setFiles={setMoreFiles} />
-
         <div style={{ marginTop: 8 }}>
           {uploadImagesBtn ? (
             <button

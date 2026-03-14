@@ -1337,6 +1337,7 @@ export default function Home() {
             isCopyMode={isCopyMode}
             setIsCopyMode={setIsCopyMode}
             isVirtual={isCurrentlyVirtual}
+            setQuestions={setQuestions}
           />
         ) : (
           <div className="placeholder">Select a question number</div>
