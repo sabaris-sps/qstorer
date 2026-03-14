@@ -916,18 +916,15 @@ body.invert-all-images .PhotoView-Photo {
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border-radius: 12px;
+  border-radius: 5px;
   font-size: 0.8rem;
   font-weight: bold;
-  color: white;
-  margin-right: 6px;
-  margin-bottom: 6px;
+  color: black;
+  margin-right: 5px;
 }
 
 .tag-pill .remove-tag {
   cursor: pointer;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 50%;
   width: 16px;
   height: 16px;
   display: flex;

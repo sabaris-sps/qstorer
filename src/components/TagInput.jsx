@@ -32,7 +32,7 @@ export default function TagInput({
     if (val.trim()) {
       const filtered = globalTags.filter(
         (t) =>
-          t.name.toLowerCase().includes(val.toLowerCase()) &&
+          t.name.trim().toLowerCase().includes(val.toLowerCase()) &&
           !(questionTags || []).includes(t.id),
       );
       setSuggestions(filtered);
