@@ -11,7 +11,6 @@ export default function TagInput({
   const [isFocused, setIsFocused] = useState(false);
   const wrapperRef = useRef(null);
 
-  // Close suggestions if clicked outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
@@ -22,17 +21,15 @@ export default function TagInput({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Map the tag IDs stored on the question to the full tag objects
   const activeTags = (questionTags || [])
     .map((tagId) => globalTags.find((t) => t.id === tagId))
-    .filter(Boolean); // Filter out any tags that might have been deleted globally
+    .filter(Boolean);
 
   const handleInputChange = (e) => {
     const val = e.target.value;
     setInputValue(val);
 
     if (val.trim()) {
-      // Filter global tags that match the input AND aren't already added to this question
       const filtered = globalTags.filter(
         (t) =>
           t.name.toLowerCase().includes(val.toLowerCase()) &&
@@ -47,7 +44,6 @@ export default function TagInput({
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && inputValue.trim()) {
       e.preventDefault();
-      // If there's an exact match in suggestions, use it. Otherwise, create new.
       const exactMatch = suggestions.find(
         (s) => s.name.toLowerCase() === inputValue.trim().toLowerCase(),
       );
@@ -55,12 +51,11 @@ export default function TagInput({
       if (exactMatch) {
         onAddTag(exactMatch.name);
       } else {
-        onAddTag(inputValue.trim()); // Will trigger creation of a new tag
+        onAddTag(inputValue.trim());
       }
       setInputValue("");
       setSuggestions([]);
     } else if (e.key === "Backspace" && !inputValue && activeTags.length > 0) {
-      // Remove last tag if backspace is pressed on empty input
       onRemoveTag(activeTags[activeTags.length - 1].id);
     }
   };
@@ -69,7 +64,7 @@ export default function TagInput({
     onAddTag(tagName);
     setInputValue("");
     setSuggestions([]);
-    setIsFocused(true); // Keep focus to add more
+    setIsFocused(true);
   };
 
   return (
@@ -85,12 +80,11 @@ export default function TagInput({
         backgroundColor: "var(--bg-dark)",
         minHeight: "34px",
         marginRight: "10px",
-        flex: 1, // Take up available space next to buttons
-        maxWidth: "400px", // Don't let it get too huge on big screens
+        flex: 1,
+        maxWidth: "400px",
       }}
       onClick={() => setIsFocused(true)}
     >
-      {/* Render selected Tag Pills */}
       {activeTags.map((tag) => (
         <span
           key={tag.id}
