@@ -5,7 +5,9 @@ import CreateChapter from "./pages/CreateChapter";
 import CreateAssignment from "./pages/CreateAssignment";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import { auth } from "./firebase";
+import TagManager from "./pages/TagManager"; // NEW IMPORT
+import { auth, db } from "./firebase";
+import { collection, getDocs } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import "./App.css";
 
@@ -16,25 +18,51 @@ export default function App() {
   const [selectedChapter, setSelectedChapter] = useState("");
   const [selectedAssignment, setSelectedAssignment] = useState("");
   const [user, setUser] = useState(null);
+
+  // NEW: Global Tags state
+  const [tags, setTags] = useState([]);
+
   const navigate = useNavigate();
 
-  // Initialize from localStorage (defaults to false)
   const [invertImages, setInvertImages] = useState(() => {
     const saved = localStorage.getItem("invertImages");
     return saved === "true";
   });
 
-  // auth listener
+  // NEW: Show/Hide Tags toggle
+  const [showTags, setShowTags] = useState(() => {
+    const saved = localStorage.getItem("showTags");
+    return saved !== "false"; // Default to true
+  });
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setSelectedChapter("");
       setSelectedAssignment("");
+      if (u) {
+        loadTags(u.uid); // Load tags on login
+      } else {
+        setTags([]);
+      }
     });
     return () => unsub();
   }, []);
 
-  // Sync invertImages with localStorage and update body class
+  // NEW: Load global tags
+  const loadTags = async (uid) => {
+    try {
+      const snap = await getDocs(collection(db, "users", uid, "tags"));
+      const loadedTags = snap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setTags(loadedTags);
+    } catch (error) {
+      console.error("Failed to load tags:", error);
+    }
+  };
+
   useEffect(() => {
     localStorage.setItem("invertImages", invertImages);
     if (invertImages) {
@@ -44,9 +72,12 @@ export default function App() {
     }
   }, [invertImages]);
 
-  async function reloadChapters() {
-    // Chapters are loaded in Home and other pages (using user context)
-  }
+  // NEW: Sync showTags with local storage
+  useEffect(() => {
+    localStorage.setItem("showTags", showTags);
+  }, [showTags]);
+
+  async function reloadChapters() {}
 
   async function handleLogout() {
     await signOut(auth);
@@ -64,8 +95,12 @@ export default function App() {
         selectedAssignment,
         setSelectedAssignment,
         user,
-        invertImages, // Exported in case you need it in other components later
+        invertImages,
         setInvertImages,
+        showTags, // Pass to context
+        tags, // Pass to context
+        setTags, // Pass to context
+        loadTags, // Pass to context
       }}
     >
       <div className="app-root">
@@ -75,7 +110,6 @@ export default function App() {
               QStorer
             </Link>
           </div>
-          {/* Added align-items: center so the toggle sits perfectly centered */}
           <nav className="toplinks" style={{ alignItems: "center" }}>
             {!user ? (
               <>
@@ -92,31 +126,70 @@ export default function App() {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "8px",
+                    gap: "12px",
                     marginRight: "12px",
                   }}
                 >
-                  <label
-                    htmlFor="invert-toggle"
+                  <div
                     style={{
-                      fontSize: "0.85rem",
-                      cursor: "pointer",
-                      color: "var(--text-primary)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
                     }}
                   >
-                    Invert Images
-                  </label>
-                  <label className="switch" style={{ margin: 0 }}>
-                    <input
-                      id="invert-toggle"
-                      type="checkbox"
-                      checked={invertImages}
-                      onChange={(e) => setInvertImages(e.target.checked)}
-                    />
-                    <span className="slider"></span>
-                  </label>
+                    <label
+                      htmlFor="tags-toggle"
+                      style={{
+                        fontSize: "0.85rem",
+                        cursor: "pointer",
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      Show Tags
+                    </label>
+                    <label className="switch" style={{ margin: 0 }}>
+                      <input
+                        id="tags-toggle"
+                        type="checkbox"
+                        checked={showTags}
+                        onChange={(e) => setShowTags(e.target.checked)}
+                      />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <label
+                      htmlFor="invert-toggle"
+                      style={{
+                        fontSize: "0.85rem",
+                        cursor: "pointer",
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      Invert Images
+                    </label>
+                    <label className="switch" style={{ margin: 0 }}>
+                      <input
+                        id="invert-toggle"
+                        type="checkbox"
+                        checked={invertImages}
+                        onChange={(e) => setInvertImages(e.target.checked)}
+                      />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
                 </div>
 
+                <Link to="/tags" className="toplink">
+                  Manage Tags
+                </Link>
                 <Link to="/create-chapter" className="toplink">
                   Create Chapter
                 </Link>
@@ -144,6 +217,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/create-chapter" element={<CreateChapter />} />
             <Route path="/create-assignment" element={<CreateAssignment />} />
+            <Route path="/tags" element={<TagManager />} /> {/* NEW ROUTE */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
           </Routes>

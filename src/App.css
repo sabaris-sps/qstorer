@@ -908,6 +908,81 @@ body.invert-all-images .PhotoView-Photo {
   filter: invert(1) !important;
 }
 
+/* ===================================== */
+/* 12. Tag Input UI                      */
+/* ===================================== */
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: white;
+  margin-right: 6px;
+  margin-bottom: 6px;
+}
+
+.tag-pill .remove-tag {
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.tag-pill .remove-tag:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.tag-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tag-input-field {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  outline: none;
+  min-width: 100px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 4px 0;
+}
+
+.tag-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--bg-light);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  z-index: 100;
+  max-height: 200px;
+  overflow-y: auto;
+  min-width: 150px;
+}
+
+.tag-suggestion-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.tag-suggestion-item:hover {
+  background: var(--bg-dark);
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
