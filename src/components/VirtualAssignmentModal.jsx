@@ -290,20 +290,19 @@ export default function VirtualAssignmentModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h4>{isEditing ? "Update Filtered View" : "Create Filtered View"}</h4>
-        <div style={{ marginBottom: 15, display: "flex", gap: "5px" }}>
-          <label>View Name</label>
+        <div style={{ marginBottom: 8, display: "flex", gap: "5px" }}>
+          <label style={{ alignSelf: "center" }}>View Name</label>
           <input
             type="text"
-            className="form-control"
+            className="form-control modal-input"
             value={newAssignmentName}
             onChange={(e) => setNewAssignmentName(e.target.value)}
             placeholder="Revision Questions"
-            style={{ padding: "5px" }}
           />
         </div>
 
-        <div style={{ marginBottom: 15, display: "flex", gap: "5px" }}>
-          <label>Save Under Chapter</label>
+        <div style={{ marginBottom: 8, display: "flex", gap: "5px" }}>
+          <label style={{ alignSelf: "center" }}>Save Under Chapter</label>
           <select
             className="form-control"
             value={targetChapterId}
@@ -351,11 +350,19 @@ export default function VirtualAssignmentModal({
 
         {configMode === "common" ? (
           <div>
-            <div style={{ marginBottom: 15 }}>
-              <label>Common Numbers (e.g. 1-5, 10)</label>
+            <div
+              style={{
+                marginBottom: 15,
+                display: "flex",
+                gap: "5px",
+                alignContent: "center",
+              }}
+            >
+              <label style={{ alignSelf: "center" }}>Common Numbers</label>
               <input
                 type="text"
-                className="form-control"
+                placeholder="1-5, 10"
+                className="form-control modal-input"
                 value={commonNumbers}
                 onChange={(e) => setCommonNumbers(e.target.value)}
               />
@@ -366,10 +373,10 @@ export default function VirtualAssignmentModal({
             </div>
 
             <div style={{ marginBottom: 15 }}>
-              <label>Common Tag Query (e.g. "Math" and "Hard")</label>
+              <label>Common Tag Query</label>
               <input
                 type="text"
-                className="form-control"
+                className="form-control modal-input"
                 placeholder='("Algebra" or "Trig") and ("PnC" and "Calculus)'
                 value={commonTagQuery}
                 onChange={(e) => setCommonTagQuery(e.target.value)}
@@ -520,9 +527,9 @@ export default function VirtualAssignmentModal({
                 </div>
                 <input
                   type="text"
-                  placeholder="Numbers (1-5, 10)"
-                  className="form-control"
-                  style={{ marginBottom: 8 }}
+                  placeholder="1-5, 10"
+                  className="form-control modal-input"
+                  style={{ marginRight: "2px" }}
                   value={h.numbers}
                   onChange={(e) => {
                     const newH = [...handles];
@@ -532,9 +539,8 @@ export default function VirtualAssignmentModal({
                 />
                 <input
                   type="text"
-                  placeholder='Tag Query (e.g. "Math" and "Hard")'
-                  className="form-control"
-                  style={{ marginBottom: 8 }}
+                  placeholder='"Math" and "Hard"'
+                  className="form-control modal-input"
                   value={h.tagQuery}
                   onChange={(e) => {
                     const newH = [...handles];
