@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   collection,
   getDocs,
@@ -7,7 +7,8 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
-import { parseNumberList } from "../utils";
+import { parseNumberList, evaluateTagQuery } from "../utils";
+import { AppContext } from "../App";
 
 const COLORS = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#b185db", "none"];
 
@@ -31,6 +32,7 @@ export default function VirtualAssignmentModal({
   const [commonNumbers, setCommonNumbers] = useState("");
   const [commonColors, setCommonColors] = useState([]);
   const [commonAssignments, setCommonAssignments] = useState([]);
+  const [commonTagQuery, setCommonTagQuery] = useState("");
 
   // Handles state
   const [handles, setHandles] = useState([
@@ -38,6 +40,8 @@ export default function VirtualAssignmentModal({
   ]);
 
   const isEditing = !!existingAssignment;
+
+  const { tags } = useContext(AppContext);
 
   useEffect(() => {
     if (isOpen) {
@@ -54,25 +58,40 @@ export default function VirtualAssignmentModal({
         if (cfg.common) {
           setCommonNumbers(cfg.common.numbers || "");
           setCommonColors(cfg.common.colors || []);
+          setCommonTagQuery(cfg.common.tagQuery || "");
           setCommonAssignments(cfg.common.assignments || []);
         }
         if (cfg.handles) {
           setHandles(
             cfg.handles.length > 0
               ? cfg.handles
-              : [{ chapterId: "", assignmentId: "", numbers: "", colors: [] }],
+              : [
+                  {
+                    chapterId: "",
+                    assignmentId: "",
+                    numbers: "",
+                    colors: [],
+                    tagQuery: "",
+                  },
+                ],
           );
         }
       } else {
-        // RESET STATE FOR NEW CREATION
         setNewAssignmentName("");
         setTargetChapterId("");
         setConfigMode("common");
         setCommonNumbers("");
         setCommonColors([]);
+        setCommonTagQuery("");
         setCommonAssignments([]);
         setHandles([
-          { chapterId: "", assignmentId: "", numbers: "", colors: [] },
+          {
+            chapterId: "",
+            assignmentId: "",
+            numbers: "",
+            colors: [],
+            tagQuery: "",
+          },
         ]);
       }
     }
@@ -113,6 +132,7 @@ export default function VirtualAssignmentModal({
               ...a,
               numbers: commonNumbers,
               colors: commonColors,
+              tagQuery: commonTagQuery,
             }))
           : handles;
 
@@ -137,13 +157,22 @@ export default function VirtualAssignmentModal({
 
         qSnap.docs.forEach((docSnap) => {
           const data = docSnap.data();
+
           const numMatches =
             targetNums.length === 0 || targetNums.includes(data.number);
           const cColor = data.color || "none";
           const colorMatches =
             target.colors.length === 0 || target.colors.includes(cColor);
 
-          if (numMatches && colorMatches) {
+          let tagMatches = true;
+          if (target.tagQuery) {
+            const questionTagNames = (data.tags || [])
+              .map((tagId) => tags.find((t) => t.id === tagId)?.name)
+              .filter(Boolean);
+            tagMatches = evaluateTagQuery(target.tagQuery, questionTagNames);
+          }
+
+          if (numMatches && colorMatches && tagMatches) {
             collectedRefs.push({
               chapterId: target.chapterId,
               assignmentId: target.assignmentId,
@@ -168,6 +197,7 @@ export default function VirtualAssignmentModal({
           numbers: commonNumbers,
           colors: commonColors,
           assignments: commonAssignments,
+          tagQuery: commonTagQuery,
         },
         handles: handles,
       };
@@ -335,6 +365,17 @@ export default function VirtualAssignmentModal({
               {renderColorPicker(commonColors, setCommonColors)}
             </div>
 
+            <div style={{ marginBottom: 15 }}>
+              <label>Common Tag Query (e.g. "Math" and "Hard")</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder='("Algebra" or "Trig") and ("PnC" and "Calculus)'
+                value={commonTagQuery}
+                onChange={(e) => setCommonTagQuery(e.target.value)}
+              />
+            </div>
+
             <label>Include Assignments:</label>
             {commonAssignments.map((ca, i) => (
               <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
@@ -486,6 +527,18 @@ export default function VirtualAssignmentModal({
                   onChange={(e) => {
                     const newH = [...handles];
                     newH[i].numbers = e.target.value;
+                    setHandles(newH);
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder='Tag Query (e.g. "Math" and "Hard")'
+                  className="form-control"
+                  style={{ marginBottom: 8 }}
+                  value={h.tagQuery}
+                  onChange={(e) => {
+                    const newH = [...handles];
+                    newH[i].tagQuery = e.target.value;
                     setHandles(newH);
                   }}
                 />

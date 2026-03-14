@@ -296,3 +296,37 @@ export const exportQuestionsToPDF = async (
   const pdfBytes = await pdfDoc.save();
   download(pdfBytes, `${name}.pdf`, "application/pdf");
 };
+
+export function evaluateTagQuery(query, questionTagNames) {
+  if (!query || !query.trim()) return true;
+
+  try {
+    const qTagsLower = questionTagNames.map((t) => t.toLowerCase());
+
+    const quoteRegex = /(["'])(.*?)\1/g;
+
+    let processedQuery = query.replace(
+      quoteRegex,
+      (match, quote, innerString) => {
+        const hasTag = qTagsLower.includes(innerString.toLowerCase());
+        return hasTag ? " true " : " false ";
+      },
+    );
+
+    processedQuery = processedQuery
+      .replace(/\band\b/gi, " && ")
+      .replace(/\bor\b/gi, " || ")
+      .replace(/\bnot\b/gi, " ! ");
+
+    const safeRegex = /^[truefals&|!()\s]+$/;
+    if (!safeRegex.test(processedQuery)) {
+      return false;
+    }
+
+    // eslint-disable-next-line no-new-func
+    const result = new Function(`return !!(${processedQuery});`)();
+    return result;
+  } catch (e) {
+    return false;
+  }
+}

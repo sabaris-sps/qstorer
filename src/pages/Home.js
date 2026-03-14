@@ -24,7 +24,7 @@ import EditNamesModal from "../components/EditNamesModal";
 import CreateQuestion from "../components/CreateQuestion";
 import QuestionCard from "../components/QuestionCard";
 import SelectionBar from "../components/SelectionBar";
-import { sanitizePublicId, parseNumberList } from "../utils";
+import { sanitizePublicId, parseNumberList, evaluateTagQuery } from "../utils";
 import FilterModal from "../components/FilterModal";
 import VirtualAssignmentModal from "../components/VirtualAssignmentModal";
 
@@ -47,6 +47,7 @@ export default function Home() {
     selectedAssignment,
     setSelectedAssignment,
     user,
+    tags,
   } = useContext(AppContext);
 
   const [assignments, setAssignments] = useState([]);
@@ -96,6 +97,7 @@ export default function Home() {
   const [filterConfig, setFilterConfig] = useState({
     numberText: "",
     colors: [],
+    tagQuery: "",
   });
 
   // Virtual View Modal
@@ -1114,7 +1116,11 @@ export default function Home() {
   // -----------------------------------------------------------
   const visibleQuestions = useMemo(() => {
     // If no filters are active, return original list
-    if (!filterConfig.numberText && filterConfig.colors.length === 0) {
+    if (
+      !filterConfig.numberText &&
+      filterConfig.colors.length === 0 &&
+      !filterConfig.tagQuery
+    ) {
       return questions;
     }
 
@@ -1129,9 +1135,19 @@ export default function Home() {
       const colorMatches = hasColorFilter
         ? filterConfig.colors.includes(q.color)
         : true;
-      return numberMatches && colorMatches;
+
+      let tagMatches = true;
+      if (filterConfig.tagQuery) {
+        const questionTagNames = (q.tags || [])
+          .map((tagId) => tags.find((t) => t.id === tagId)?.name)
+          .filter(Boolean);
+
+        tagMatches = evaluateTagQuery(filterConfig.tagQuery, questionTagNames);
+      }
+
+      return numberMatches && colorMatches && tagMatches;
     });
-  }, [questions, filterConfig]);
+  }, [questions, filterConfig, tags]);
 
   useEffect(() => {
     function handleKeyDown(e) {

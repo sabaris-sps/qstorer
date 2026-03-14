@@ -1,13 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-// Matches the colors in QuestionCard.jsx
-const COLORS = [
-  "#ef476f", // Red/Pink
-  "#ffd166", // Yellow/Gold
-  "#06d6a0", // Green
-  "#118ab2", // Blue
-  "#b185db", // Purple
-];
+const COLORS = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#b185db"];
 
 export default function FilterModal({
   isOpen,
@@ -17,12 +10,12 @@ export default function FilterModal({
 }) {
   const [textInput, setTextInput] = useState("");
   const [selectedColors, setSelectedColors] = useState([]);
-
-  // Load current filter into local state when modal opens
+  const [tagQuery, setTagQuery] = useState("");
   useEffect(() => {
     if (isOpen) {
       setTextInput(currentFilter.numberText || "");
       setSelectedColors(currentFilter.colors || []);
+      setTagQuery(currentFilter.tagQuery || "");
     }
   }, [isOpen, currentFilter]);
 
@@ -37,12 +30,12 @@ export default function FilterModal({
   };
 
   const handleApply = () => {
-    onApply({ numberText: textInput, colors: selectedColors });
+    onApply({ numberText: textInput, colors: selectedColors, tagQuery });
     onClose();
   };
 
   const handleClear = () => {
-    onApply({ numberText: "", colors: [] });
+    onApply({ numberText: "", colors: [], tagQuery: "" });
     onClose();
   };
 
@@ -51,6 +44,7 @@ export default function FilterModal({
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h4>Filter Questions</h4>
 
+        {/* --- NUMBERS --- */}
         <div style={{ marginBottom: 16 }}>
           <label
             style={{
@@ -70,6 +64,38 @@ export default function FilterModal({
           />
         </div>
 
+        {/* --- TAG QUERY --- */}
+        <div style={{ marginBottom: 16 }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: 4,
+              color: "var(--text-secondary)",
+            }}
+          >
+            By Tags (Boolean Query)
+          </label>
+          <p
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--text-secondary)",
+              marginBottom: "8px",
+              marginTop: 0,
+            }}
+          >
+            Use quotes around tags. Example:{" "}
+            <b>("Algebra" or "Geometry") and "Hard"</b>
+          </p>
+          <input
+            type="text"
+            placeholder='e.g. ("tag1" or "tag2") and not "tag3"'
+            value={tagQuery}
+            onChange={(e) => setTagQuery(e.target.value)}
+            style={{ width: "100%", padding: "8px", fontFamily: "monospace" }}
+          />
+        </div>
+
+        {/* --- COLORS --- */}
         <div style={{ marginBottom: 24 }}>
           <label
             style={{
@@ -106,17 +132,6 @@ export default function FilterModal({
               />
             ))}
           </div>
-          <small
-            style={{
-              color: "var(--text-secondary)",
-              marginTop: 6,
-              display: "block",
-            }}
-          >
-            {selectedColors.length === 0
-              ? "Showing all colors (no filter applied)"
-              : "Showing questions containing ANY of the selected colors"}
-          </small>
         </div>
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
