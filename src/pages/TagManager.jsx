@@ -136,23 +136,24 @@ export default function TagManager() {
                   }}
                 >
                   <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    style={{ margin: 0, padding: "5px", flex: 1 }}
-                  />
-                  <input
                     type="color"
                     value={editColor}
                     onChange={(e) => setEditColor(e.target.value)}
                     style={{
+                      margin: 0,
                       padding: 0,
                       height: "30px",
-                      width: "40px",
+                      width: "30px",
                       border: "none",
                       background: "none",
                       cursor: "pointer",
                     }}
+                  />
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    style={{ margin: 0, padding: "6px 10px", width: "200px" }}
                   />
                 </div>
               ) : (
@@ -162,9 +163,9 @@ export default function TagManager() {
                   <span
                     style={{
                       backgroundColor: tag.color || "#118ab2",
-                      color: "#fff",
+                      color: "#000",
                       padding: "4px 10px",
-                      borderRadius: "12px",
+                      borderRadius: "5px",
                       fontSize: "0.85rem",
                       fontWeight: "bold",
                     }}
@@ -177,7 +178,8 @@ export default function TagManager() {
                       color: "var(--text-secondary)",
                     }}
                   >
-                    Used in <b>{tag.count || 0}</b> questions
+                    (<b>{tag.count || 0}</b> question
+                    {(tag.count || 0) > 1 ? "s" : ""})
                   </span>
                 </div>
               )}
