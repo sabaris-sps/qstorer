@@ -27,6 +27,7 @@ import SelectionBar from "../components/SelectionBar";
 import { sanitizePublicId, parseNumberList, evaluateTagQuery } from "../utils";
 import FilterModal from "../components/FilterModal";
 import VirtualAssignmentModal from "../components/VirtualAssignmentModal";
+import ImportChapterModal from "../components/ImportChapterModal";
 
 /* Toast component */
 function Toast({ toast }) {
@@ -103,6 +104,8 @@ export default function Home() {
   // Virtual View Modal
   const [showVirtualModal, setShowVirtualModal] = useState(false);
   const [virtualModalEditData, setVirtualModalData] = useState(null);
+
+  const [showImportChapterModal, setShowImportChapterModal] = useState(false);
 
   // require login
   useEffect(() => {
@@ -1260,6 +1263,165 @@ export default function Home() {
     reader.readAsText(file);
   };
 
+  // --- CHAPTER EXPORT LOGIC ---
+  const handleExportChapter = async () => {
+    if (!selectedChapter) {
+      showToast("Select a chapter to export", "error");
+      return;
+    }
+
+    showToast("Compiling chapter data... this may take a moment.");
+    try {
+      const uid = auth.currentUser.uid;
+      const chapDoc = chapters.find((c) => c.id === selectedChapter);
+
+      const asgSnap = await getDocs(
+        collection(
+          db,
+          "users",
+          uid,
+          "chapters",
+          selectedChapter,
+          "assignments",
+        ),
+      );
+
+      const assignmentsData = [];
+
+      // Loop through assignments
+      for (const aDoc of asgSnap.docs) {
+        const asgData = aDoc.data();
+
+        // Skip virtual views to avoid complexity/broken refs on import
+        if (asgData.isVirtual) continue;
+
+        // Fetch questions for this assignment
+        const qSnap = await getDocs(
+          query(
+            collection(
+              db,
+              "users",
+              uid,
+              "chapters",
+              selectedChapter,
+              "assignments",
+              aDoc.id,
+              "questions",
+            ),
+            orderBy("number", "asc"),
+          ),
+        );
+
+        const questionsData = qSnap.docs.map((q) => {
+          const data = q.data();
+          return {
+            number: data.number,
+            note: data.note || "",
+            images: data.images || [],
+            color: data.color || null,
+            tags: data.tags || [],
+          };
+        });
+
+        assignmentsData.push({
+          name: asgData.name,
+          questions: questionsData,
+        });
+      }
+
+      const exportObj = {
+        type: "qstorer_chapter_export",
+        chapterName: chapDoc.name,
+        assignments: assignmentsData,
+      };
+
+      // Generate Download
+      const blob = new Blob([JSON.stringify(exportObj, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${sanitizePublicId(chapDoc.name)}-full-chapter.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      showToast("Chapter exported successfully!");
+    } catch (error) {
+      console.error("Chapter export failed:", error);
+      showToast("Failed to export chapter", "error");
+    }
+  };
+
+  // --- CHAPTER IMPORT LOGIC ---
+  const handleImportChapterConfirm = async (parsedData) => {
+    try {
+      const uid = auth.currentUser.uid;
+
+      // 1. Create the new Chapter Document
+      const newChapRef = await addDoc(
+        collection(db, "users", uid, "chapters"),
+        {
+          name: parsedData.chapterName,
+        },
+      );
+
+      // 2. Loop through assignments and create them
+      for (const asg of parsedData.assignments) {
+        const newAsgRef = await addDoc(
+          collection(
+            db,
+            "users",
+            uid,
+            "chapters",
+            newChapRef.id,
+            "assignments",
+          ),
+          {
+            name: asg.name,
+            isVirtual: false, // Ensures imported assignments act as native standard lists
+          },
+        );
+
+        // 3. Batch create questions (doing it sequentially to guarantee integrity)
+        const questionsCollectionRef = collection(
+          db,
+          "users",
+          uid,
+          "chapters",
+          newChapRef.id,
+          "assignments",
+          newAsgRef.id,
+          "questions",
+        );
+
+        // We Promise.all the questions within each assignment for speed
+        const qPromises = asg.questions.map((qData) => {
+          return addDoc(questionsCollectionRef, {
+            number: qData.number,
+            note: qData.note || "",
+            images: qData.images || [],
+            color: qData.color || null,
+            tags: qData.tags || [],
+          });
+        });
+
+        await Promise.all(qPromises);
+      }
+
+      showToast(`Chapter '${parsedData.chapterName}' imported successfully!`);
+
+      // Reload UI and select the newly imported chapter
+      await loadChaptersForUser();
+      setSelectedChapter(newChapRef.id);
+      setSelectedAssignment("");
+      setQuestions([]);
+    } catch (error) {
+      console.error("Chapter import failed:", error);
+      showToast("Failed to import chapter data", "error");
+    }
+  };
+
   return (
     <div className="home-grid">
       {/* modal for editing chapter, assignment name */}
@@ -1305,6 +1467,13 @@ export default function Home() {
         }}
         existingAssignment={virtualModalEditData}
         currentChapterId={selectedChapter}
+      />
+
+      <ImportChapterModal
+        isOpen={showImportChapterModal}
+        onClose={() => setShowImportChapterModal(false)}
+        onImport={handleImportChapterConfirm}
+        showToast={showToast}
       />
 
       <Sidebar
@@ -1354,6 +1523,8 @@ export default function Home() {
             setShowVirtualModal(true);
           }}
           onImportJSON={handleImportJSON}
+          onExportChapter={handleExportChapter}
+          onImportChapterClick={() => setShowImportChapterModal(true)}
         />
 
         {!selectedChapter || !selectedAssignment ? (

@@ -24,7 +24,9 @@ export default function SelectionBar({
   isVirtual,
   onCreateVirtual,
   onEditVirtual,
-  onImportJSON, // NEW: Prop to handle import logic
+  onImportJSON,
+  onExportChapter,
+  onImportChapterClick,
 }) {
   const [showExportModal, setShowExportModal] = useState(false);
   const fileInputRef = useRef(null); // NEW: Reference for the hidden file input
@@ -124,6 +126,23 @@ export default function SelectionBar({
                 </option>
               ))}
           </select>
+
+          <button
+            className="btn-outline-secondary btn-sm"
+            onClick={onImportChapterClick}
+            title="Import Chapter JSON"
+          >
+            Import
+          </button>
+          {selectedChapter && (
+            <button
+              className="btn-outline-secondary btn-sm"
+              onClick={onExportChapter}
+              title="Export Entire Chapter to JSON"
+            >
+              Export
+            </button>
+          )}
         </div>
 
         <div className="sel-item">
