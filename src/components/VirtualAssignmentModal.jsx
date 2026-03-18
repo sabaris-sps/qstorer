@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   collection,
   getDocs,
@@ -40,8 +40,32 @@ export default function VirtualAssignmentModal({
   ]);
 
   const isEditing = !!existingAssignment;
-
   const { tags } = useContext(AppContext);
+
+  // --- Drag and Drop Refs & Handlers ---
+  const dragItem = useRef(null);
+  const dragOverItem = useRef(null);
+
+  const handleSortCommon = () => {
+    if (dragItem.current === null || dragOverItem.current === null) return;
+    let _assignments = [...commonAssignments];
+    const draggedItemContent = _assignments.splice(dragItem.current, 1)[0];
+    _assignments.splice(dragOverItem.current, 0, draggedItemContent);
+    dragItem.current = null;
+    dragOverItem.current = null;
+    setCommonAssignments(_assignments);
+  };
+
+  const handleSortHandles = () => {
+    if (dragItem.current === null || dragOverItem.current === null) return;
+    let _handles = [...handles];
+    const draggedItemContent = _handles.splice(dragItem.current, 1)[0];
+    _handles.splice(dragOverItem.current, 0, draggedItemContent);
+    dragItem.current = null;
+    dragOverItem.current = null;
+    setHandles(_handles);
+  };
+  // ------------------------------------
 
   useEffect(() => {
     if (isOpen) {
@@ -385,7 +409,35 @@ export default function VirtualAssignmentModal({
 
             <label>Include Assignments:</label>
             {commonAssignments.map((ca, i) => (
-              <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <div
+                key={i}
+                draggable
+                onDragStart={(e) => {
+                  dragItem.current = i;
+                  e.currentTarget.style.opacity = "0.5";
+                }}
+                onDragEnter={() => (dragOverItem.current = i)}
+                onDragEnd={(e) => {
+                  e.currentTarget.style.opacity = "1";
+                  handleSortCommon();
+                }}
+                onDragOver={(e) => e.preventDefault()}
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  marginBottom: 8,
+                  alignItems: "center",
+                  cursor: "grab",
+                  padding: "4px",
+                  borderRadius: "4px",
+                  backgroundColor: "rgba(255,255,255,0.02)",
+                }}
+              >
+                <span
+                  style={{ color: "var(--text-secondary)", cursor: "grab" }}
+                >
+                  ☰
+                </span>
                 <select
                   value={ca.chapterId}
                   onChange={(e) => {
@@ -394,6 +446,7 @@ export default function VirtualAssignmentModal({
                     newAsg[i].assignmentId = "";
                     setCommonAssignments(newAsg);
                   }}
+                  style={{ flex: 1 }}
                 >
                   <option value="">Chap</option>
                   {chapters
@@ -416,6 +469,7 @@ export default function VirtualAssignmentModal({
                     newAsg[i].assignmentId = e.target.value;
                     setCommonAssignments(newAsg);
                   }}
+                  style={{ flex: 1 }}
                 >
                   <option value="">Asgn</option>
                   {(assignmentsByChapter[ca.chapterId] || [])
@@ -452,6 +506,7 @@ export default function VirtualAssignmentModal({
                   { chapterId: "", assignmentId: "" },
                 ])
               }
+              style={{ marginTop: "10px" }}
             >
               + Add Assignment
             </button>
@@ -462,14 +517,43 @@ export default function VirtualAssignmentModal({
             {handles.map((h, i) => (
               <div
                 key={i}
+                draggable
+                onDragStart={(e) => {
+                  dragItem.current = i;
+                  e.currentTarget.style.opacity = "0.5";
+                }}
+                onDragEnter={() => (dragOverItem.current = i)}
+                onDragEnd={(e) => {
+                  e.currentTarget.style.opacity = "1";
+                  handleSortHandles();
+                }}
+                onDragOver={(e) => e.preventDefault()}
                 style={{
-                  border: "1px solid #eee",
+                  border: "1px solid var(--border-color)",
+                  backgroundColor: "var(--bg-dark)",
                   padding: 10,
                   marginBottom: 10,
                   borderRadius: 5,
+                  cursor: "grab",
                 }}
               >
-                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    marginBottom: 8,
+                    alignItems: "center",
+                  }}
+                >
+                  <span
+                    style={{
+                      color: "var(--text-secondary)",
+                      cursor: "grab",
+                      marginRight: "4px",
+                    }}
+                  >
+                    ☰
+                  </span>
                   <select
                     value={h.chapterId}
                     onChange={(e) => {
@@ -478,6 +562,7 @@ export default function VirtualAssignmentModal({
                       newH[i].assignmentId = "";
                       setHandles(newH);
                     }}
+                    style={{ flex: 1 }}
                   >
                     <option value="">Chap</option>
                     {chapters
@@ -500,6 +585,7 @@ export default function VirtualAssignmentModal({
                       newH[i].assignmentId = e.target.value;
                       setHandles(newH);
                     }}
+                    style={{ flex: 1 }}
                   >
                     <option value="">Asgn</option>
                     {(assignmentsByChapter[h.chapterId] || [])
@@ -529,7 +615,11 @@ export default function VirtualAssignmentModal({
                   type="text"
                   placeholder="1-5, 10"
                   className="form-control modal-input"
-                  style={{ marginRight: "2px" }}
+                  style={{
+                    marginRight: "2px",
+                    width: "100%",
+                    marginBottom: "8px",
+                  }}
                   value={h.numbers}
                   onChange={(e) => {
                     const newH = [...handles];
@@ -541,6 +631,7 @@ export default function VirtualAssignmentModal({
                   type="text"
                   placeholder='"Math" and "Hard"'
                   className="form-control modal-input"
+                  style={{ width: "100%" }}
                   value={h.tagQuery}
                   onChange={(e) => {
                     const newH = [...handles];
