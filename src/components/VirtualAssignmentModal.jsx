@@ -31,13 +31,15 @@ export default function VirtualAssignmentModal({
   // Common condition state
   const [commonNumbers, setCommonNumbers] = useState("");
   const [commonColors, setCommonColors] = useState([]);
-  const [commonAssignments, setCommonAssignments] = useState([]);
   const [commonTagQuery, setCommonTagQuery] = useState("");
 
-  // Handles state
+  // Unified Handles state (used for BOTH Common and Handles modes to keep them in sync)
   const [handles, setHandles] = useState([
-    { chapterId: "", assignmentId: "", numbers: "", colors: [] },
+    { chapterId: "", assignmentId: "", numbers: "", colors: [], tagQuery: "" },
   ]);
+
+  // Bulk add state
+  const [bulkChapterId, setBulkChapterId] = useState("");
 
   const isEditing = !!existingAssignment;
   const { tags } = useContext(AppContext);
@@ -45,16 +47,6 @@ export default function VirtualAssignmentModal({
   // --- Drag and Drop Refs & Handlers ---
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
-
-  const handleSortCommon = () => {
-    if (dragItem.current === null || dragOverItem.current === null) return;
-    let _assignments = [...commonAssignments];
-    const draggedItemContent = _assignments.splice(dragItem.current, 1)[0];
-    _assignments.splice(dragOverItem.current, 0, draggedItemContent);
-    dragItem.current = null;
-    dragOverItem.current = null;
-    setCommonAssignments(_assignments);
-  };
 
   const handleSortHandles = () => {
     if (dragItem.current === null || dragOverItem.current === null) return;
@@ -65,41 +57,105 @@ export default function VirtualAssignmentModal({
     dragOverItem.current = null;
     setHandles(_handles);
   };
-  // ------------------------------------
+
+  // --- Bulk Add Handler ---
+  const handleAddFullChapter = () => {
+    if (!bulkChapterId) return;
+
+    const assignmentsInChapter = assignmentsByChapter[bulkChapterId] || [];
+    const validAssignments = assignmentsInChapter
+      .filter((a) => !a.isVirtual)
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }),
+      );
+
+    if (validAssignments.length === 0) {
+      return showToast(
+        "No standard assignments found in this chapter.",
+        "error",
+      );
+    }
+
+    const newHandles = validAssignments.map((a) => ({
+      chapterId: bulkChapterId,
+      assignmentId: a.id,
+      numbers: "",
+      colors: [],
+      tagQuery: "",
+    }));
+
+    setHandles([...handles, ...newHandles]);
+    setBulkChapterId(""); // Reset the selection after adding
+    showToast(`Added ${newHandles.length} assignments from the chapter.`);
+  };
 
   useEffect(() => {
     if (isOpen) {
       loadAssignmentsForAllChapters();
 
-      // PRE-FILL STATE IF EDITING
       if (existingAssignment) {
         setNewAssignmentName(existingAssignment.name);
         setTargetChapterId(currentChapterId);
 
         const cfg = existingAssignment.config || {};
-        setConfigMode(cfg.mode || "common");
+        const savedMode = cfg.mode || "common";
+        setConfigMode(savedMode);
 
         if (cfg.common) {
           setCommonNumbers(cfg.common.numbers || "");
           setCommonColors(cfg.common.colors || []);
           setCommonTagQuery(cfg.common.tagQuery || "");
-          setCommonAssignments(cfg.common.assignments || []);
         }
-        if (cfg.handles) {
-          setHandles(
-            cfg.handles.length > 0
-              ? cfg.handles
-              : [
-                  {
-                    chapterId: "",
-                    assignmentId: "",
-                    numbers: "",
-                    colors: [],
-                    tagQuery: "",
-                  },
-                ],
-          );
+
+        let initialHandles = [];
+
+        // BUGFIX: Properly parse old vs new data structures
+        if (savedMode === "handles" && cfg.handles && cfg.handles.length > 0) {
+          initialHandles = cfg.handles;
+        } else if (savedMode === "common") {
+          // If the view was saved as common, prioritize common.assignments
+          // (because older saves had an empty array in cfg.handles that blocked parsing)
+          if (
+            cfg.common &&
+            cfg.common.assignments &&
+            cfg.common.assignments.length > 0
+          ) {
+            initialHandles = cfg.common.assignments.map((a) => ({
+              chapterId: a.chapterId || "",
+              assignmentId: a.assignmentId || "",
+              numbers: "",
+              colors: [],
+              tagQuery: "",
+            }));
+          } else if (cfg.handles && cfg.handles.length > 0) {
+            initialHandles = cfg.handles;
+          } else {
+            initialHandles = [
+              {
+                chapterId: "",
+                assignmentId: "",
+                numbers: "",
+                colors: [],
+                tagQuery: "",
+              },
+            ];
+          }
+        } else {
+          initialHandles = [
+            {
+              chapterId: "",
+              assignmentId: "",
+              numbers: "",
+              colors: [],
+              tagQuery: "",
+            },
+          ];
         }
+
+        setHandles(initialHandles);
       } else {
         setNewAssignmentName("");
         setTargetChapterId("");
@@ -107,7 +163,6 @@ export default function VirtualAssignmentModal({
         setCommonNumbers("");
         setCommonColors([]);
         setCommonTagQuery("");
-        setCommonAssignments([]);
         setHandles([
           {
             chapterId: "",
@@ -117,6 +172,7 @@ export default function VirtualAssignmentModal({
             tagQuery: "",
           },
         ]);
+        setBulkChapterId("");
       }
     }
   }, [isOpen, existingAssignment, currentChapterId]);
@@ -133,7 +189,6 @@ export default function VirtualAssignmentModal({
       return showToast("Please provide a name and target chapter.", "error");
     }
 
-    // Check for duplicate names (only if creating OR changing name)
     const existingAssignments = assignmentsByChapter[targetChapterId] || [];
     const nameExists = existingAssignments.some(
       (a) =>
@@ -152,15 +207,14 @@ export default function VirtualAssignmentModal({
       let collectedRefs = [];
       const targets =
         configMode === "common"
-          ? commonAssignments.map((a) => ({
-              ...a,
+          ? handles.map((h) => ({
+              ...h,
               numbers: commonNumbers,
               colors: commonColors,
               tagQuery: commonTagQuery,
             }))
           : handles;
 
-      // 1. Fetch matching questions (Reads isolated to targeted assignments)
       for (const target of targets) {
         if (!target.chapterId || !target.assignmentId) continue;
 
@@ -214,14 +268,16 @@ export default function VirtualAssignmentModal({
         );
       }
 
-      // 2. Build the payload including the config state
       const configToSave = {
         mode: configMode,
         common: {
           numbers: commonNumbers,
           colors: commonColors,
-          assignments: commonAssignments,
           tagQuery: commonTagQuery,
+          assignments: handles.map((h) => ({
+            chapterId: h.chapterId,
+            assignmentId: h.assignmentId,
+          })),
         },
         handles: handles,
       };
@@ -230,10 +286,9 @@ export default function VirtualAssignmentModal({
         name: newAssignmentName.trim(),
         isVirtual: true,
         refs: collectedRefs,
-        config: configToSave, // <-- Preserving conditions
+        config: configToSave,
       };
 
-      // 3. Update or Add
       if (isEditing) {
         await updateDoc(
           doc(
@@ -303,6 +358,69 @@ export default function VirtualAssignmentModal({
           {c === "none" && "None"}
         </div>
       ))}
+    </div>
+  );
+
+  const renderListControls = () => (
+    <div
+      style={{
+        display: "flex",
+        gap: "10px",
+        marginTop: "15px",
+        alignItems: "center",
+        flexWrap: "wrap",
+      }}
+    >
+      <button
+        className="btn-outline-primary btn-sm"
+        onClick={() =>
+          setHandles([
+            ...handles,
+            {
+              chapterId: "",
+              assignmentId: "",
+              numbers: "",
+              colors: [],
+              tagQuery: "",
+            },
+          ])
+        }
+      >
+        {configMode === "common" ? "+ Add Assignment" : "+ Add Handle"}
+      </button>
+
+      <div
+        style={{ borderLeft: "1px solid var(--border-color)", height: "20px" }}
+      ></div>
+
+      <select
+        value={bulkChapterId}
+        onChange={(e) => setBulkChapterId(e.target.value)}
+        className="form-control"
+        style={{ width: "auto", padding: "4px 8px" }}
+      >
+        <option value="">Select Chapter...</option>
+        {chapters
+          .sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, {
+              numeric: true,
+              sensitivity: "base",
+            }),
+          )
+          .map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+      </select>
+
+      <button
+        className="btn-outline-secondary btn-sm"
+        onClick={handleAddFullChapter}
+        disabled={!bulkChapterId}
+      >
+        + Add Full Chapter
+      </button>
     </div>
   );
 
@@ -408,7 +526,7 @@ export default function VirtualAssignmentModal({
             </div>
 
             <label>Include Assignments:</label>
-            {commonAssignments.map((ca, i) => (
+            {handles.map((h, i) => (
               <div
                 key={i}
                 draggable
@@ -419,7 +537,7 @@ export default function VirtualAssignmentModal({
                 onDragEnter={() => (dragOverItem.current = i)}
                 onDragEnd={(e) => {
                   e.currentTarget.style.opacity = "1";
-                  handleSortCommon();
+                  handleSortHandles();
                 }}
                 onDragOver={(e) => e.preventDefault()}
                 style={{
@@ -439,12 +557,12 @@ export default function VirtualAssignmentModal({
                   ☰
                 </span>
                 <select
-                  value={ca.chapterId}
+                  value={h.chapterId}
                   onChange={(e) => {
-                    const newAsg = [...commonAssignments];
-                    newAsg[i].chapterId = e.target.value;
-                    newAsg[i].assignmentId = "";
-                    setCommonAssignments(newAsg);
+                    const newH = [...handles];
+                    newH[i].chapterId = e.target.value;
+                    newH[i].assignmentId = "";
+                    setHandles(newH);
                   }}
                   style={{ flex: 1 }}
                 >
@@ -463,16 +581,16 @@ export default function VirtualAssignmentModal({
                     ))}
                 </select>
                 <select
-                  value={ca.assignmentId}
+                  value={h.assignmentId}
                   onChange={(e) => {
-                    const newAsg = [...commonAssignments];
-                    newAsg[i].assignmentId = e.target.value;
-                    setCommonAssignments(newAsg);
+                    const newH = [...handles];
+                    newH[i].assignmentId = e.target.value;
+                    setHandles(newH);
                   }}
                   style={{ flex: 1 }}
                 >
                   <option value="">Asgn</option>
-                  {(assignmentsByChapter[ca.chapterId] || [])
+                  {(assignmentsByChapter[h.chapterId] || [])
                     .sort((a, b) =>
                       a.name.localeCompare(b.name, undefined, {
                         numeric: true,
@@ -489,27 +607,15 @@ export default function VirtualAssignmentModal({
                 <button
                   className="btn-danger btn-sm"
                   onClick={() =>
-                    setCommonAssignments(
-                      commonAssignments.filter((_, idx) => idx !== i),
-                    )
+                    setHandles(handles.filter((_, idx) => idx !== i))
                   }
                 >
                   ✕
                 </button>
               </div>
             ))}
-            <button
-              className="btn-outline-primary btn-sm"
-              onClick={() =>
-                setCommonAssignments([
-                  ...commonAssignments,
-                  { chapterId: "", assignmentId: "" },
-                ])
-              }
-              style={{ marginTop: "10px" }}
-            >
-              + Add Assignment
-            </button>
+
+            {renderListControls()}
           </div>
         ) : (
           <div>
@@ -646,17 +752,8 @@ export default function VirtualAssignmentModal({
                 })}
               </div>
             ))}
-            <button
-              className="btn-outline-primary btn-sm"
-              onClick={() =>
-                setHandles([
-                  ...handles,
-                  { chapterId: "", assignmentId: "", numbers: "", colors: [] },
-                ])
-              }
-            >
-              + Add Handle
-            </button>
+
+            {renderListControls()}
           </div>
         )}
 
