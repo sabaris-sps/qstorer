@@ -12,6 +12,18 @@ import { AppContext } from "../App";
 
 const COLORS = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#b185db", "none"];
 
+// --- Helper: Generate a consistent pastel/tint based on a string ---
+const getChapterTint = (chapterId) => {
+  if (!chapterId) return "var(--bg-dark)";
+  let hash = 0;
+  for (let i = 0; i < chapterId.length; i++) {
+    hash = chapterId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  // 15% opacity tint over the dark background keeps text readable
+  return `hsla(${hue}, 70%, 60%, 0.15)`;
+};
+
 export default function VirtualAssignmentModal({
   isOpen,
   onClose,
@@ -33,7 +45,7 @@ export default function VirtualAssignmentModal({
   const [commonColors, setCommonColors] = useState([]);
   const [commonTagQuery, setCommonTagQuery] = useState("");
 
-  // Unified Handles state (used for BOTH Common and Handles modes to keep them in sync)
+  // Unified Handles state
   const [handles, setHandles] = useState([
     { chapterId: "", assignmentId: "", numbers: "", colors: [], tagQuery: "" },
   ]);
@@ -58,7 +70,7 @@ export default function VirtualAssignmentModal({
     setHandles(_handles);
   };
 
-  // --- Bulk Add Handler ---
+  // --- Bulk Add & Clear Handlers ---
   const handleAddFullChapter = () => {
     if (!bulkChapterId) return;
 
@@ -87,9 +99,37 @@ export default function VirtualAssignmentModal({
       tagQuery: "",
     }));
 
-    setHandles([...handles, ...newHandles]);
-    setBulkChapterId(""); // Reset the selection after adding
+    // If the only handle is an empty default one, replace it. Otherwise, append.
+    if (
+      handles.length === 1 &&
+      !handles[0].chapterId &&
+      !handles[0].assignmentId
+    ) {
+      setHandles(newHandles);
+    } else {
+      setHandles([...handles, ...newHandles]);
+    }
+
+    setBulkChapterId("");
     showToast(`Added ${newHandles.length} assignments from the chapter.`);
+  };
+
+  const handleClearAll = () => {
+    if (
+      window.confirm(
+        "Are you sure you want to clear all assignments from this view?",
+      )
+    ) {
+      setHandles([
+        {
+          chapterId: "",
+          assignmentId: "",
+          numbers: "",
+          colors: [],
+          tagQuery: "",
+        },
+      ]);
+    }
   };
 
   useEffect(() => {
@@ -111,13 +151,9 @@ export default function VirtualAssignmentModal({
         }
 
         let initialHandles = [];
-
-        // BUGFIX: Properly parse old vs new data structures
         if (savedMode === "handles" && cfg.handles && cfg.handles.length > 0) {
           initialHandles = cfg.handles;
         } else if (savedMode === "common") {
-          // If the view was saved as common, prioritize common.assignments
-          // (because older saves had an empty array in cfg.handles that blocked parsing)
           if (
             cfg.common &&
             cfg.common.assignments &&
@@ -154,7 +190,6 @@ export default function VirtualAssignmentModal({
             },
           ];
         }
-
         setHandles(initialHandles);
       } else {
         setNewAssignmentName("");
@@ -365,7 +400,7 @@ export default function VirtualAssignmentModal({
     <div
       style={{
         display: "flex",
-        gap: "10px",
+        gap: "8px",
         marginTop: "15px",
         alignItems: "center",
         flexWrap: "wrap",
@@ -390,7 +425,11 @@ export default function VirtualAssignmentModal({
       </button>
 
       <div
-        style={{ borderLeft: "1px solid var(--border-color)", height: "20px" }}
+        style={{
+          borderLeft: "1px solid var(--border-color)",
+          height: "20px",
+          margin: "0 5px",
+        }}
       ></div>
 
       <select
@@ -421,6 +460,20 @@ export default function VirtualAssignmentModal({
       >
         + Add Full Chapter
       </button>
+
+      {handles.length > 1 && (
+        <button
+          className="btn-outline-secondary btn-sm"
+          onClick={handleClearAll}
+          style={{
+            marginLeft: "auto",
+            color: "var(--danger)",
+            borderColor: "var(--danger)",
+          }}
+        >
+          Clear All
+        </button>
+      )}
     </div>
   );
 
@@ -428,29 +481,34 @@ export default function VirtualAssignmentModal({
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="modal"
-        style={{ width: "500px", maxHeight: "90vh", overflowY: "auto" }}
+        style={{ width: "550px", maxHeight: "90vh", overflowY: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >
         <h4>{isEditing ? "Update Filtered View" : "Create Filtered View"}</h4>
         <div style={{ marginBottom: 8, display: "flex", gap: "5px" }}>
-          <label style={{ alignSelf: "center" }}>View Name</label>
+          <label style={{ alignSelf: "center", minWidth: "140px" }}>
+            View Name
+          </label>
           <input
             type="text"
             className="form-control modal-input"
             value={newAssignmentName}
             onChange={(e) => setNewAssignmentName(e.target.value)}
             placeholder="Revision Questions"
+            style={{ flex: 1 }}
           />
         </div>
 
-        <div style={{ marginBottom: 8, display: "flex", gap: "5px" }}>
-          <label style={{ alignSelf: "center" }}>Save Under Chapter</label>
+        <div style={{ marginBottom: 15, display: "flex", gap: "5px" }}>
+          <label style={{ alignSelf: "center", minWidth: "140px" }}>
+            Save Under Chapter
+          </label>
           <select
             className="form-control"
             value={targetChapterId}
             onChange={(e) => setTargetChapterId(e.target.value)}
             disabled={isEditing}
-            style={{ padding: "5px" }}
+            style={{ padding: "5px", flex: 1 }}
           >
             <option value="">Select Chapter</option>
             {chapters
@@ -466,196 +524,113 @@ export default function VirtualAssignmentModal({
                 </option>
               ))}
           </select>
-          {isEditing && (
-            <small style={{ color: "#888" }}>
+        </div>
+        {isEditing && (
+          <div
+            style={{
+              marginTop: "-10px",
+              marginBottom: "15px",
+              textAlign: "right",
+            }}
+          >
+            <small style={{ color: "var(--text-secondary)" }}>
               Chapter cannot be changed while updating.
             </small>
-          )}
-        </div>
+          </div>
+        )}
 
         <div style={{ display: "flex", gap: 10, marginBottom: 15 }}>
           <button
             className={`btn-sm ${configMode === "common" ? "btn-primary" : "btn-outline-secondary"}`}
             onClick={() => setConfigMode("common")}
+            style={{ flex: 1 }}
           >
             Common Condition
           </button>
           <button
             className={`btn-sm ${configMode === "handles" ? "btn-primary" : "btn-outline-secondary"}`}
             onClick={() => setConfigMode("handles")}
+            style={{ flex: 1 }}
           >
             Per Assignment (Handles)
           </button>
         </div>
 
-        <hr />
+        <hr style={{ borderColor: "var(--border-color)", margin: "15px 0" }} />
 
         {configMode === "common" ? (
           <div>
-            <div
-              style={{
-                marginBottom: 15,
-                display: "flex",
-                gap: "5px",
-                alignContent: "center",
-              }}
-            >
-              <label style={{ alignSelf: "center" }}>Common Numbers</label>
+            <div style={{ marginBottom: 15, display: "flex", gap: "5px" }}>
+              <label style={{ alignSelf: "center", minWidth: "140px" }}>
+                Common Numbers
+              </label>
               <input
                 type="text"
                 placeholder="1-5, 10"
                 className="form-control modal-input"
                 value={commonNumbers}
                 onChange={(e) => setCommonNumbers(e.target.value)}
+                style={{ flex: 1 }}
               />
             </div>
-            <div style={{ marginBottom: 15 }}>
-              <label>Common Colors</label>
-              {renderColorPicker(commonColors, setCommonColors)}
-            </div>
 
-            <div style={{ marginBottom: 15 }}>
-              <label>Common Tag Query</label>
+            <div style={{ marginBottom: 15, display: "flex", gap: "5px" }}>
+              <label style={{ alignSelf: "center", minWidth: "140px" }}>
+                Common Tag Query
+              </label>
               <input
                 type="text"
                 className="form-control modal-input"
-                placeholder='("Algebra" or "Trig") and ("PnC" and "Calculus)'
+                placeholder='("Algebra" or "Trig") and ("PnC" or "Calculus")'
                 value={commonTagQuery}
                 onChange={(e) => setCommonTagQuery(e.target.value)}
+                style={{ flex: 1 }}
               />
             </div>
 
-            <label>Include Assignments:</label>
-            {handles.map((h, i) => (
-              <div
-                key={i}
-                draggable
-                onDragStart={(e) => {
-                  dragItem.current = i;
-                  e.currentTarget.style.opacity = "0.5";
-                }}
-                onDragEnter={() => (dragOverItem.current = i)}
-                onDragEnd={(e) => {
-                  e.currentTarget.style.opacity = "1";
-                  handleSortHandles();
-                }}
-                onDragOver={(e) => e.preventDefault()}
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  marginBottom: 8,
-                  alignItems: "center",
-                  cursor: "grab",
-                  padding: "4px",
-                  borderRadius: "4px",
-                  backgroundColor: "rgba(255,255,255,0.02)",
-                }}
-              >
-                <span
-                  style={{ color: "var(--text-secondary)", cursor: "grab" }}
-                >
-                  ☰
-                </span>
-                <select
-                  value={h.chapterId}
-                  onChange={(e) => {
-                    const newH = [...handles];
-                    newH[i].chapterId = e.target.value;
-                    newH[i].assignmentId = "";
-                    setHandles(newH);
-                  }}
-                  style={{ flex: 1 }}
-                >
-                  <option value="">Chap</option>
-                  {chapters
-                    .sort((a, b) =>
-                      a.name.localeCompare(b.name, undefined, {
-                        numeric: true,
-                        sensitivity: "base",
-                      }),
-                    )
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                </select>
-                <select
-                  value={h.assignmentId}
-                  onChange={(e) => {
-                    const newH = [...handles];
-                    newH[i].assignmentId = e.target.value;
-                    setHandles(newH);
-                  }}
-                  style={{ flex: 1 }}
-                >
-                  <option value="">Asgn</option>
-                  {(assignmentsByChapter[h.chapterId] || [])
-                    .sort((a, b) =>
-                      a.name.localeCompare(b.name, undefined, {
-                        numeric: true,
-                        sensitivity: "base",
-                      }),
-                    )
-                    .filter((a) => !a.isVirtual)
-                    .map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                </select>
-                <button
-                  className="btn-danger btn-sm"
-                  onClick={() =>
-                    setHandles(handles.filter((_, idx) => idx !== i))
-                  }
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", marginBottom: "5px" }}>
+                Common Colors
+              </label>
+              {renderColorPicker(commonColors, setCommonColors)}
+            </div>
 
-            {renderListControls()}
-          </div>
-        ) : (
-          <div>
-            <label>Handles:</label>
-            {handles.map((h, i) => (
-              <div
-                key={i}
-                draggable
-                onDragStart={(e) => {
-                  dragItem.current = i;
-                  e.currentTarget.style.opacity = "0.5";
-                }}
-                onDragEnter={() => (dragOverItem.current = i)}
-                onDragEnd={(e) => {
-                  e.currentTarget.style.opacity = "1";
-                  handleSortHandles();
-                }}
-                onDragOver={(e) => e.preventDefault()}
-                style={{
-                  border: "1px solid var(--border-color)",
-                  backgroundColor: "var(--bg-dark)",
-                  padding: 10,
-                  marginBottom: 10,
-                  borderRadius: 5,
-                  cursor: "grab",
-                }}
-              >
+            <label style={{ fontWeight: 600, color: "var(--primary)" }}>
+              Include Assignments ({handles.length}):
+            </label>
+            <div style={{ marginTop: "10px" }}>
+              {handles.map((h, i) => (
                 <div
+                  key={i}
+                  draggable
+                  onDragStart={(e) => {
+                    dragItem.current = i;
+                    e.currentTarget.style.opacity = "0.5";
+                  }}
+                  onDragEnter={() => (dragOverItem.current = i)}
+                  onDragEnd={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                    handleSortHandles();
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
                   style={{
                     display: "flex",
                     gap: 8,
-                    marginBottom: 8,
+                    marginBottom: 6,
                     alignItems: "center",
+                    cursor: "grab",
+                    padding: "6px 8px",
+                    borderRadius: "4px",
+                    backgroundColor: getChapterTint(h.chapterId), // Subtle tint application!
+                    border: "1px solid var(--border-color)",
+                    transition: "transform 0.1s",
                   }}
                 >
                   <span
                     style={{
                       color: "var(--text-secondary)",
                       cursor: "grab",
-                      marginRight: "4px",
+                      userSelect: "none",
                     }}
                   >
                     ☰
@@ -668,7 +643,7 @@ export default function VirtualAssignmentModal({
                       newH[i].assignmentId = "";
                       setHandles(newH);
                     }}
-                    style={{ flex: 1 }}
+                    style={{ flex: 1, padding: "4px" }}
                   >
                     <option value="">Chap</option>
                     {chapters
@@ -691,7 +666,7 @@ export default function VirtualAssignmentModal({
                       newH[i].assignmentId = e.target.value;
                       setHandles(newH);
                     }}
-                    style={{ flex: 1 }}
+                    style={{ flex: 1, padding: "4px" }}
                   >
                     <option value="">Asgn</option>
                     {(assignmentsByChapter[h.chapterId] || [])
@@ -713,45 +688,156 @@ export default function VirtualAssignmentModal({
                     onClick={() =>
                       setHandles(handles.filter((_, idx) => idx !== i))
                     }
+                    style={{ padding: "4px 8px" }}
                   >
                     ✕
                   </button>
                 </div>
-                <input
-                  type="text"
-                  placeholder="1-5, 10"
-                  className="form-control modal-input"
+              ))}
+            </div>
+
+            {renderListControls()}
+          </div>
+        ) : (
+          <div>
+            <label style={{ fontWeight: 600, color: "var(--primary)" }}>
+              Assignment Handles ({handles.length}):
+            </label>
+            <div style={{ marginTop: "10px" }}>
+              {handles.map((h, i) => (
+                <div
+                  key={i}
+                  draggable
+                  onDragStart={(e) => {
+                    dragItem.current = i;
+                    e.currentTarget.style.opacity = "0.5";
+                  }}
+                  onDragEnter={() => (dragOverItem.current = i)}
+                  onDragEnd={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                    handleSortHandles();
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
                   style={{
-                    marginRight: "2px",
-                    width: "100%",
+                    border: "1px solid var(--border-color)",
+                    backgroundColor: getChapterTint(h.chapterId), // Subtle tint application!
+                    padding: "8px 10px",
                     marginBottom: "8px",
+                    borderRadius: "6px",
+                    cursor: "grab",
                   }}
-                  value={h.numbers}
-                  onChange={(e) => {
-                    const newH = [...handles];
-                    newH[i].numbers = e.target.value;
-                    setHandles(newH);
-                  }}
-                />
-                <input
-                  type="text"
-                  placeholder='"Math" and "Hard"'
-                  className="form-control modal-input"
-                  style={{ width: "100%" }}
-                  value={h.tagQuery}
-                  onChange={(e) => {
-                    const newH = [...handles];
-                    newH[i].tagQuery = e.target.value;
-                    setHandles(newH);
-                  }}
-                />
-                {renderColorPicker(h.colors, (newColors) => {
-                  const newH = [...handles];
-                  newH[i].colors = newColors;
-                  setHandles(newH);
-                })}
-              </div>
-            ))}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      marginBottom: 8,
+                      alignItems: "center",
+                    }}
+                  >
+                    <span
+                      style={{
+                        color: "var(--text-secondary)",
+                        cursor: "grab",
+                        userSelect: "none",
+                      }}
+                    >
+                      ☰
+                    </span>
+                    <select
+                      value={h.chapterId}
+                      onChange={(e) => {
+                        const newH = [...handles];
+                        newH[i].chapterId = e.target.value;
+                        newH[i].assignmentId = "";
+                        setHandles(newH);
+                      }}
+                      style={{ flex: 1, padding: "4px" }}
+                    >
+                      <option value="">Chap</option>
+                      {chapters
+                        .sort((a, b) =>
+                          a.name.localeCompare(b.name, undefined, {
+                            numeric: true,
+                            sensitivity: "base",
+                          }),
+                        )
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                    </select>
+                    <select
+                      value={h.assignmentId}
+                      onChange={(e) => {
+                        const newH = [...handles];
+                        newH[i].assignmentId = e.target.value;
+                        setHandles(newH);
+                      }}
+                      style={{ flex: 1, padding: "4px" }}
+                    >
+                      <option value="">Asgn</option>
+                      {(assignmentsByChapter[h.chapterId] || [])
+                        .sort((a, b) =>
+                          a.name.localeCompare(b.name, undefined, {
+                            numeric: true,
+                            sensitivity: "base",
+                          }),
+                        )
+                        .filter((a) => !a.isVirtual)
+                        .map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      className="btn-danger btn-sm"
+                      onClick={() =>
+                        setHandles(handles.filter((_, idx) => idx !== i))
+                      }
+                      style={{ padding: "4px 8px" }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="text"
+                      placeholder="1-5, 10"
+                      className="form-control modal-input"
+                      style={{ flex: 0.4, padding: "4px 8px" }}
+                      value={h.numbers}
+                      onChange={(e) => {
+                        const newH = [...handles];
+                        newH[i].numbers = e.target.value;
+                        setHandles(newH);
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder='"Math" and "Hard"'
+                      className="form-control modal-input"
+                      style={{ flex: 0.6, padding: "4px 8px" }}
+                      value={h.tagQuery}
+                      onChange={(e) => {
+                        const newH = [...handles];
+                        newH[i].tagQuery = e.target.value;
+                        setHandles(newH);
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginTop: "4px" }}>
+                    {renderColorPicker(h.colors, (newColors) => {
+                      const newH = [...handles];
+                      newH[i].colors = newColors;
+                      setHandles(newH);
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
 
             {renderListControls()}
           </div>
@@ -762,7 +848,9 @@ export default function VirtualAssignmentModal({
             display: "flex",
             justifyContent: "flex-end",
             gap: 10,
-            marginTop: 20,
+            marginTop: 25,
+            paddingTop: 15,
+            borderTop: "1px solid var(--border-color)",
           }}
         >
           <button className="btn-outline-secondary" onClick={onClose}>
@@ -772,6 +860,7 @@ export default function VirtualAssignmentModal({
             className="btn-success"
             onClick={handleSave}
             disabled={isSaving}
+            style={{ padding: "8px 20px" }}
           >
             {isSaving ? "Saving..." : isEditing ? "Update View" : "Create View"}
           </button>
