@@ -1,6 +1,6 @@
-import React, { useState } from "react"; // Added useState
+import React, { useState, useRef } from "react";
 import { exportQuestionsToPDF } from "../utils";
-import ExportModal from "./ExportModal"; // Import the new modal
+import ExportModal from "./ExportModal";
 
 export default function SelectionBar({
   selectedChapter,
@@ -24,10 +24,11 @@ export default function SelectionBar({
   isVirtual,
   onCreateVirtual,
   onEditVirtual,
+  onImportJSON, // NEW: Prop to handle import logic
 }) {
   const [showExportModal, setShowExportModal] = useState(false);
+  const fileInputRef = useRef(null); // NEW: Reference for the hidden file input
 
-  // Helper to get current assignment name safely
   const getCurrentAssignmentName = () => {
     const assignment = assignments.find((a) => a.id === selectedAssignment);
     return assignment ? assignment.name : "questions";
@@ -41,21 +42,50 @@ export default function SelectionBar({
     setShowExportModal(true);
   };
 
-  // Modal Confirm: Actually generate PDF
   const handleConfirmExport = async (fileName, options) => {
     try {
-      // Pass the options (includeNotes) to the utility
-      await exportQuestionsToPDF(questions, fileName, options);
-      showToast("PDF Downloaded");
+      if (options.format === "json") {
+        // --- JSON EXPORT LOGIC ---
+        const dataToExport = questions.map((q, idx) => ({
+          number: idx + 1, // Serial order
+          note: options.includeNotes ? q.note || "" : "",
+          images: q.images || [],
+          color: q.color || null,
+        }));
+
+        const blob = new Blob([JSON.stringify(dataToExport, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${fileName}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        showToast("JSON Downloaded");
+      } else {
+        // --- PDF EXPORT LOGIC ---
+        await exportQuestionsToPDF(questions, fileName, options);
+        showToast("PDF Downloaded");
+      }
     } catch (error) {
-      console.error("PDF Export failed:", error);
+      console.error("Export failed:", error);
       showToast("Export failed", "error");
     }
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      onImportJSON(file);
+    }
+    // Reset input so the same file can be selected again if needed
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   return (
     <>
-      {/* Render the Export Modal */}
       <ExportModal
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
@@ -63,7 +93,17 @@ export default function SelectionBar({
         onExport={handleConfirmExport}
       />
 
+      {/* Hidden file input for importing JSON */}
+      <input
+        type="file"
+        accept=".json"
+        style={{ display: "none" }}
+        ref={fileInputRef}
+        onChange={handleFileChange}
+      />
+
       <div className="selection-bar">
+        {/* ... KEEP EXISTING CHAPTER/ASSIGNMENT DROPDOWNS HERE ... */}
         <div className="sel-item">
           <label>Chap</label>
           <select
@@ -143,8 +183,18 @@ export default function SelectionBar({
             onClick={handleExportClick}
             style={{ marginLeft: "10px" }}
           >
-            Export PDF
+            Export
           </button>
+
+          {/* NEW: Import JSON Button (Only show if not in a virtual view and an assignment is selected) */}
+          {!isVirtual && selectedAssignment && (
+            <button
+              className="btn-outline-secondary btn-sm"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Import JSON
+            </button>
+          )}
 
           <button
             className="btn-outline-secondary btn-sm"

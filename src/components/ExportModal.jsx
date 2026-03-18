@@ -7,12 +7,14 @@ export default function ExportModal({
   onExport,
 }) {
   const [fileName, setFileName] = useState("");
-  const [includeNotes, setIncludeNotes] = useState(true); // Default to true
+  const [includeNotes, setIncludeNotes] = useState(true);
+  const [format, setFormat] = useState("pdf"); // NEW: Track format
 
   useEffect(() => {
     if (isOpen) {
       setFileName(defaultName || "assignment-export");
-      setIncludeNotes(true); // Reset to default on open
+      setIncludeNotes(true);
+      setFormat("pdf"); // Reset to default
     }
   }, [isOpen, defaultName]);
 
@@ -23,15 +25,15 @@ export default function ExportModal({
       alert("Please enter a file name");
       return;
     }
-    // Pass both name and options
-    onExport(fileName, { includeNotes });
+    // Pass both name and options (including format)
+    onExport(fileName, { includeNotes, format });
     onClose();
   };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h4>Export PDF</h4>
+        <h4>Export Assignment</h4>
 
         <label
           style={{
@@ -51,8 +53,46 @@ export default function ExportModal({
           onKeyDown={(e) => {
             if (e.key === "Enter") handleConfirm();
           }}
-          style={{ width: "100%", marginBottom: 20 }}
+          style={{ width: "100%", marginBottom: 20, padding: "10px" }}
         />
+
+        {/* Format Selector */}
+        <div style={{ marginBottom: 20, display: "flex", gap: "15px" }}>
+          <label
+            style={{
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              fontSize: "large",
+            }}
+          >
+            <input
+              type="radio"
+              value="pdf"
+              checked={format === "pdf"}
+              onChange={(e) => setFormat(e.target.value)}
+            />
+            PDF Document
+          </label>
+          <label
+            style={{
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              fontSize: "large",
+            }}
+          >
+            <input
+              type="radio"
+              value="json"
+              checked={format === "json"}
+              onChange={(e) => setFormat(e.target.value)}
+            />
+            JSON Data
+          </label>
+        </div>
 
         {/* Toggle Switch for Notes */}
         <div className="toggle-container" style={{ marginBottom: 20 }}>
@@ -72,7 +112,7 @@ export default function ExportModal({
             Cancel
           </button>
           <button className="btn-primary" onClick={handleConfirm}>
-            Download PDF
+            Export File
           </button>
         </div>
       </div>

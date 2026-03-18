@@ -1199,6 +1199,67 @@ export default function Home() {
   const currentAsgObj = assignments.find((a) => a.id === selectedAssignment);
   const isCurrentlyVirtual = currentAsgObj?.isVirtual || false;
 
+  // --- Handle JSON Import ---
+  const handleImportJSON = async (file) => {
+    if (!selectedChapter || !selectedAssignment) {
+      showToast("Select a chapter & assignment to import into", "error");
+      return;
+    }
+
+    const currentAsg = assignments.find((a) => a.id === selectedAssignment);
+    if (currentAsg?.isVirtual) {
+      showToast("Cannot import directly into a virtual view", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!Array.isArray(data))
+          throw new Error("File must contain an array of questions.");
+
+        showToast(`Importing ${data.length} questions...`);
+        const uid = auth.currentUser.uid;
+        const questionsCollectionRef = collection(
+          db,
+          "users",
+          uid,
+          "chapters",
+          selectedChapter,
+          "assignments",
+          selectedAssignment,
+          "questions",
+        );
+
+        // Get the current max number so we don't overwrite existing questions
+        const qSnap = await getDocs(
+          query(questionsCollectionRef, orderBy("number", "asc")),
+        );
+        let nextStartNum = qSnap.size + 1;
+
+        // Process all uploads in parallel for speed
+        const promises = data.map((qData, index) => {
+          return addDoc(questionsCollectionRef, {
+            number: nextStartNum + index, // Add sequentially to existing count
+            note: qData.note || "",
+            images: qData.images || [],
+            color: qData.color || null,
+          });
+        });
+
+        await Promise.all(promises);
+
+        showToast(`Successfully imported ${data.length} questions!`);
+        await loadQuestions(); // Refresh UI to show the imported items
+      } catch (err) {
+        console.error("Import error:", err);
+        showToast("Invalid JSON file or format", "error");
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="home-grid">
       {/* modal for editing chapter, assignment name */}
@@ -1292,6 +1353,7 @@ export default function Home() {
             setVirtualModalData(currentAsgObj);
             setShowVirtualModal(true);
           }}
+          onImportJSON={handleImportJSON}
         />
 
         {!selectedChapter || !selectedAssignment ? (
