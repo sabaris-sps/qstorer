@@ -985,6 +985,65 @@ body.invert-all-images .PhotoView-Photo {
   background: var(--bg-dark);
 }
 
+/* ===================================== */
+/* Dropdown Menu Styles                  */
+/* ===================================== */
+.dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 8px;
+  background-color: var(--bg-light);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+  min-width: 180px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.dropdown-item {
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  border-radius: 0;
+  transition: background-color 0.2s;
+}
+
+.dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dropdown-item.danger {
+  color: #ff6b6b;
+  /* Softer red for dark theme text */
+}
+
+.dropdown-item.danger:hover {
+  background-color: var(--danger);
+  color: white;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 4px 0;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { exportQuestionsToPDF } from "../utils";
 import ExportModal from "./ExportModal";
 
@@ -29,7 +29,22 @@ export default function SelectionBar({
   onImportChapterClick,
 }) {
   const [showExportModal, setShowExportModal] = useState(false);
-  const fileInputRef = useRef(null); // NEW: Reference for the hidden file input
+  const [isMenuOpen, setIsMenuOpen] = useState(false); // Dropdown state
+  const fileInputRef = useRef(null);
+  const menuRef = useRef(null); // Ref for click-outside detection
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const getCurrentAssignmentName = () => {
     const assignment = assignments.find((a) => a.id === selectedAssignment);
@@ -47,9 +62,8 @@ export default function SelectionBar({
   const handleConfirmExport = async (fileName, options) => {
     try {
       if (options.format === "json") {
-        // --- JSON EXPORT LOGIC ---
         const dataToExport = questions.map((q, idx) => ({
-          number: idx + 1, // Serial order
+          number: idx + 1,
           note: options.includeNotes ? q.note || "" : "",
           images: q.images || [],
           color: q.color || null,
@@ -67,7 +81,6 @@ export default function SelectionBar({
 
         showToast("JSON Downloaded");
       } else {
-        // --- PDF EXPORT LOGIC ---
         await exportQuestionsToPDF(questions, fileName, options);
         showToast("PDF Downloaded");
       }
@@ -82,7 +95,6 @@ export default function SelectionBar({
     if (file) {
       onImportJSON(file);
     }
-    // Reset input so the same file can be selected again if needed
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -95,7 +107,6 @@ export default function SelectionBar({
         onExport={handleConfirmExport}
       />
 
-      {/* Hidden file input for importing JSON */}
       <input
         type="file"
         accept=".json"
@@ -105,7 +116,6 @@ export default function SelectionBar({
       />
 
       <div className="selection-bar">
-        {/* ... KEEP EXISTING CHAPTER/ASSIGNMENT DROPDOWNS HERE ... */}
         <div className="sel-item">
           <label>Chap</label>
           <select
@@ -126,23 +136,6 @@ export default function SelectionBar({
                 </option>
               ))}
           </select>
-
-          <button
-            className="btn-outline-secondary btn-sm"
-            onClick={onImportChapterClick}
-            title="Import Chapter JSON"
-          >
-            Import
-          </button>
-          {selectedChapter && (
-            <button
-              className="btn-outline-secondary btn-sm"
-              onClick={onExportChapter}
-              title="Export Entire Chapter to JSON"
-            >
-              Export
-            </button>
-          )}
         </div>
 
         <div className="sel-item">
@@ -168,6 +161,7 @@ export default function SelectionBar({
         </div>
 
         <div className="sel-actions">
+          {/* Primary Quick Actions */}
           {!isVirtual && (
             <button
               className="btn-outline-primary btn-sm"
@@ -196,58 +190,125 @@ export default function SelectionBar({
             Reload
           </button>
 
-          {/* Updated Export Button */}
-          <button
-            className="btn-outline-secondary btn-sm"
-            onClick={handleExportClick}
-            style={{ marginLeft: "10px" }}
-          >
-            Export
-          </button>
-
-          {/* NEW: Import JSON Button (Only show if not in a virtual view and an assignment is selected) */}
-          {!isVirtual && selectedAssignment && (
+          {/* More Options Dropdown */}
+          <div className="dropdown-container" ref={menuRef}>
             <button
               className="btn-outline-secondary btn-sm"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              title="More Actions"
+              style={{ padding: "6px 10px", marginLeft: "10px" }}
             >
-              Import JSON
+              {/* 3-dot Kebab Icon */}
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="1.5"></circle>
+                <circle cx="12" cy="5" r="1.5"></circle>
+                <circle cx="12" cy="19" r="1.5"></circle>
+              </svg>
             </button>
-          )}
 
-          <button
-            className="btn-outline-secondary btn-sm"
-            onClick={() => {
-              setEditTab("chapter");
-              setChapterNameEdit(
-                chapters.find((c) => c.id === selectedChapter)?.name || "",
-              );
-              setAssignmentNameEdit(
-                assignments.find((a) => a.id === selectedAssignment)?.name ||
-                  "",
-              );
-              if (selectedChapter) setShowEditNamesPopup(true);
-              else showToast("No chapter selected", "error");
-            }}
-          >
-            Edit Names
-          </button>
-          {selectedChapter && !isVirtual && (
-            <button
-              className="btn-danger btn-sm"
-              onClick={() => handleDeleteChapter(selectedChapter)}
-            >
-              Del Chap
-            </button>
-          )}
-          {selectedAssignment && (
-            <button
-              className="btn-danger btn-sm"
-              onClick={() => handleDeleteAssignment(selectedAssignment)}
-            >
-              {!isVirtual ? "Del Asgn" : "Del View"}
-            </button>
-          )}
+            {isMenuOpen && (
+              <div className="dropdown-menu">
+                <button
+                  className="dropdown-item"
+                  onClick={() => {
+                    handleExportClick();
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  Export Assignment
+                </button>
+
+                {!isVirtual && selectedAssignment && (
+                  <button
+                    className="dropdown-item"
+                    onClick={() => {
+                      fileInputRef.current?.click();
+                      setIsMenuOpen(false);
+                    }}
+                    style={{ display: "flex", flexDirection: "column" }}
+                  >
+                    <p>Import JSON</p>
+                    <p>(To current asgn)</p>
+                  </button>
+                )}
+                <hr></hr>
+                {selectedChapter && (
+                  <button
+                    className="dropdown-item"
+                    onClick={onExportChapter}
+                    title="Export Entire Chapter to JSON"
+                  >
+                    Export Chapter
+                  </button>
+                )}
+                <button
+                  className="dropdown-item"
+                  onClick={onImportChapterClick}
+                  title="Import Chapter JSON"
+                >
+                  Import Chapter
+                </button>
+
+                <hr></hr>
+                <button
+                  className="dropdown-item"
+                  onClick={() => {
+                    setEditTab("chapter");
+                    setChapterNameEdit(
+                      chapters.find((c) => c.id === selectedChapter)?.name ||
+                        "",
+                    );
+                    setAssignmentNameEdit(
+                      assignments.find((a) => a.id === selectedAssignment)
+                        ?.name || "",
+                    );
+                    if (selectedChapter) setShowEditNamesPopup(true);
+                    else showToast("No chapter selected", "error");
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  Edit Names
+                </button>
+
+                {/* Divider before destructive actions */}
+                {(selectedChapter || selectedAssignment) && (
+                  <div className="dropdown-divider"></div>
+                )}
+
+                {selectedChapter && !isVirtual && (
+                  <button
+                    className="dropdown-item danger"
+                    onClick={() => {
+                      handleDeleteChapter(selectedChapter);
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    Delete Chapter
+                  </button>
+                )}
+                {selectedAssignment && (
+                  <button
+                    className="dropdown-item danger"
+                    onClick={() => {
+                      handleDeleteAssignment(selectedAssignment);
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    {!isVirtual ? "Delete Assignment" : "Delete View"}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </>
