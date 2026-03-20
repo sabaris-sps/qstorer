@@ -81,6 +81,7 @@ export default function SelectionBar({
 
         showToast("JSON Downloaded");
       } else {
+        showToast("Generating PDF... please wait.");
         await exportQuestionsToPDF(questions, fileName, options);
         showToast("PDF Downloaded");
       }
