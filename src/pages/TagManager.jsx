@@ -29,6 +29,11 @@ export default function TagManager() {
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("");
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredTags = tags.filter((tag) =>
+    tag.name.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
 
   const handleEdit = (tag) => {
     setEditingTag(tag.id);
@@ -107,13 +112,34 @@ export default function TagManager() {
         View and manage all tags used across your questions.
       </p>
 
+      {tags.length > 0 && (
+        <div style={{ marginBottom: "20px", width: "100%" }}>
+          <input
+            type="text"
+            placeholder="Search tags..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px 15px",
+              borderRadius: "var(--radius)",
+              border: "1px solid var(--border-color)",
+              backgroundColor: "var(--bg-dark)",
+              color: "var(--text-primary)",
+            }}
+          />
+        </div>
+      )}
+
       {tags.length === 0 ? (
         <div className="placeholder">
           No tags created yet. Add them directly from your questions!
         </div>
+      ) : filteredTags.length === 0 ? (
+        <div className="placeholder">No tags matching "{searchTerm}"</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {tags.map((tag) => (
+          {filteredTags.map((tag) => (
             <div
               key={tag.id}
               style={{
