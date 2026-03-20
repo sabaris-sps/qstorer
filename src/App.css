@@ -1149,3 +1149,98 @@ body.invert-all-images .PhotoView-Photo {
     gap: 0px;
   }
 }
+
+/* 11. NoteEditor & Markdown Styles */
+.note-editor {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-top: 8px;
+  background-color: var(--bg-dark);
+}
+
+.note-tabs {
+  display: flex;
+  background-color: var(--bg-light);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.note-tab {
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  border-right: 1px solid var(--border-color);
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.note-tab.active {
+  background-color: var(--bg-dark);
+  color: var(--primary);
+  font-weight: bold;
+}
+
+.note-tab:hover:not(.active) {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.note-content textarea {
+  border: none !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  background-color: transparent !important;
+  min-height: 120px;
+}
+
+.note-preview-area {
+  padding: 12px;
+  min-height: 120px;
+  max-height: 400px;
+  overflow-y: auto;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.markdown-preview {
+  color: inherit;
+  font-family: monospace;
+}
+
+/* Markdown specific resets */
+.markdown-preview p {
+  margin-bottom: 0.8rem;
+}
+
+.markdown-preview p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-preview code {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.markdown-preview pre {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  border-radius: var(--radius);
+  overflow-x: auto;
+  margin: 10px 0;
+}
+
+.markdown-preview ul, .markdown-preview ol {
+  margin-left: 20px;
+  margin-bottom: 10px;
+}
+
+/* MathJax chem support tweaks */
+.mjx-container {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  padding: 5px 0;
+}

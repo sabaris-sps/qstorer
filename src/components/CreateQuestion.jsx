@@ -1,5 +1,6 @@
 import { useState } from "react";
 import ImageInput from "../ui/InputImage";
+import NoteEditor from "./NoteEditor";
 
 export default function CreateQuestion({
   handleCreateQuestion,
@@ -41,11 +42,10 @@ export default function CreateQuestion({
         {!isBulkMode && (
           <>
             <label style={{ fontWeight: "bold" }}>Note</label>
-            <textarea
-              id="new-question-note"
+            <NoteEditor
               value={newNoteText}
-              onChange={(e) => setNewNoteText(e.target.value)}
-              placeholder="Enter question details or paste an image..."
+              onChange={setNewNoteText}
+              placeholder="Enter question details (Markdown & Math supported)..."
             />
           </>
         )}

@@ -3,6 +3,7 @@ import { PhotoProvider, PhotoView } from "react-photo-view";
 import React, { useState, useContext } from "react";
 import TagInput from "./TagInput";
 import { AppContext } from "../App";
+import NoteEditor from "./NoteEditor";
 import {
   doc,
   updateDoc,
@@ -604,9 +605,10 @@ export default function QuestionCard({
 
       <div className="note-section">
         <label>Note</label>
-        <textarea
+        <NoteEditor
           value={noteEdit}
-          onChange={(e) => setNoteEdit(e.target.value)}
+          onChange={setNoteEdit}
+          placeholder="Edit question details (Markdown & Math supported)..."
         />
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           {saveNoteBtn ? (

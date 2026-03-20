@@ -1,5 +1,9 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import download from "downloadjs";
+import React from "react";
+import { createRoot } from "react-dom/client";
+import html2canvas from "html2canvas";
+import MarkdownRenderer from "./components/MarkdownRenderer";
 
 export function parseNumberList(input) {
   if (!input || !input.trim()) return [];
@@ -47,8 +51,76 @@ const SPACING = {
   SEPARATOR: 30,
 };
 
+// Helper to render Markdown/Math to a PNG image for PDF embedding
+const renderNoteToImage = async (note) => {
+  if (!note || !note.trim()) return null;
+
+  const container = document.createElement("div");
+  container.style.width = `${USABLE_WIDTH}px`;
+  container.style.padding = "0px";
+  container.style.backgroundColor = "white";
+  container.style.color = "black";
+  container.style.position = "fixed";
+  container.style.top = "0";
+  container.style.left = "0";
+  container.style.zIndex = "-9999";
+  container.style.pointerEvents = "none";
+  document.body.appendChild(container);
+
+  const root = createRoot(container);
+  // Force styles on the wrapper to ensure visibility during capture
+  root.render(
+    <div className="export-container" style={{ color: "black", backgroundColor: "white", width: "100%", textAlign: "left", padding: "5px" }}>
+      <style>{`
+        .export-container *, .export-container h1, .export-container h2, .export-container h3, .export-container h4, .export-container h5, .export-container h6 { 
+          color: black !important; 
+          border-color: black !important;
+          margin-top: 0 !important;
+        }
+        .export-container .katex { color: black !important; }
+        .export-container .katex * { color: black !important; }
+        .export-container p:first-child { margin-top: 0 !important; }
+        .export-container p:last-child { margin-bottom: 0 !important; }
+      `}</style>
+      <MarkdownRenderer content={note} />
+    </div>
+  );
+
+  // Wait for KaTeX to render
+  await new Promise((resolve) => setTimeout(resolve, 2500));
+
+  try {
+    const canvas = await html2canvas(container, {
+      backgroundColor: "#ffffff",
+      scale: 3, // High quality
+      useCORS: true,
+      logging: false,
+    });
+    const dataUrl = canvas.toDataURL("image/png");
+    root.unmount();
+    document.body.removeChild(container);
+    return dataUrl;
+  } catch (err) {
+    console.error("Failed to render note to image:", err);
+    if (root) root.unmount();
+    if (container.parentNode) document.body.removeChild(container);
+    return null;
+  }
+};
+
 const safeEmbedImage = async (pdfDoc, imageUrl) => {
   try {
+    // Handle data URLs (generated from notes)
+    if (imageUrl.startsWith("data:image/")) {
+      const base64Data = imageUrl.split(",")[1];
+      const imageBytes = Uint8Array.from(atob(base64Data), (c) =>
+        c.charCodeAt(0),
+      );
+      if (imageUrl.includes("image/png")) return await pdfDoc.embedPng(imageBytes);
+      if (imageUrl.includes("image/jpeg")) return await pdfDoc.embedJpg(imageBytes);
+      return null;
+    }
+
     const imageBytes = await fetch(imageUrl).then((res) => {
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       return res.arrayBuffer();
@@ -131,14 +203,22 @@ export const exportQuestionsToPDF = async (
     try {
       // --- PHASE 1: PRE-CALCULATION ---
 
-      // 2. TEXT CALCULATION (Conditionally skipped)
-      let textLines = [];
-      let textBlockHeight = 0;
-      const noteFontSize = 12;
+      // Note Image Calculation
+      let noteImage = null;
+      let noteDisplayWidth = 0;
+      let noteDisplayHeight = 0;
 
       if (includeNotes && question.note) {
-        textLines = wrapText(font, question.note, noteFontSize, USABLE_WIDTH);
-        textBlockHeight = textLines.length * SPACING.LINE_HEIGHT;
+        const noteDataUrl = await renderNoteToImage(question.note);
+        if (noteDataUrl) {
+          noteImage = await safeEmbedImage(pdfDoc, noteDataUrl);
+          if (noteImage) {
+            const { width, height } = noteImage;
+            const scaleFactor = USABLE_WIDTH / width;
+            noteDisplayWidth = USABLE_WIDTH;
+            noteDisplayHeight = height * scaleFactor;
+          }
+        }
       }
 
       // ... Image Processing (remains same) ...
@@ -177,8 +257,8 @@ export const exportQuestionsToPDF = async (
       // 3. Total Height Calculation
       const totalBlockHeight =
         SPACING.HEADER_HEIGHT +
-        textBlockHeight +
-        (textLines.length > 0 ? SPACING.AFTER_TEXT : 0) +
+        noteDisplayHeight +
+        (noteDisplayHeight > 0 ? SPACING.AFTER_TEXT : 0) +
         totalImagesHeight +
         SPACING.SEPARATOR;
 
@@ -215,23 +295,20 @@ export const exportQuestionsToPDF = async (
       });
       cursorY -= 10;
 
-      // Draw Text (Only if lines exist)
-      if (textLines.length > 0) {
-        if (checkPageBreak(cursorY, textBlockHeight + SPACING.AFTER_TEXT)) {
+      // Draw Note Image (Rendered Markdown/Math)
+      if (noteImage) {
+        if (checkPageBreak(cursorY, noteDisplayHeight + SPACING.AFTER_TEXT)) {
           page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
           cursorY = A4_HEIGHT_PTS - MARGIN;
         }
 
-        for (const line of textLines) {
-          cursorY -= SPACING.LINE_HEIGHT;
-          page.drawText(line, {
-            x: MARGIN,
-            y: cursorY,
-            size: noteFontSize,
-            font: font,
-            color: rgb(0.0, 0.0, 0.0),
-          });
-        }
+        cursorY -= noteDisplayHeight;
+        page.drawImage(noteImage, {
+          x: MARGIN,
+          y: cursorY,
+          width: noteDisplayWidth,
+          height: noteDisplayHeight,
+        });
         cursorY -= SPACING.AFTER_TEXT;
       }
 
