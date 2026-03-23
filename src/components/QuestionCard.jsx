@@ -4,16 +4,6 @@ import React, { useState, useContext } from "react";
 import TagInput from "./TagInput";
 import { AppContext } from "../App";
 import NoteEditor from "./NoteEditor";
-import {
-  doc,
-  updateDoc,
-  arrayUnion,
-  arrayRemove,
-  increment,
-  collection,
-  setDoc,
-} from "firebase/firestore";
-import { db, auth } from "../firebase";
 
 const COLORS = [
   "#ef476f", // Red/Pink
@@ -64,11 +54,13 @@ export default function QuestionCard({
   setIsCopyMode,
   isVirtual,
   setQuestions, // We need this to update the local state instantly
+  handleAddTag,
+  handleRemoveTag,
 }) {
   const [showColorTray, setShowColorTray] = useState(false);
 
   // Bring in Global Tag state from Context
-  const { tags, setTags, showTags } = useContext(AppContext);
+  const { tags, showTags } = useContext(AppContext);
 
   function openMoveUI() {
     if (!activeQuestion) {
@@ -81,127 +73,6 @@ export default function QuestionCard({
     loadAssignmentsForAllChapters();
     if (setIsCopyMode) setIsCopyMode(false);
   }
-
-  // ==========================================
-  // TAG LOGIC
-  // ==========================================
-  const handleAddTag = async (tagName) => {
-    try {
-      const uid = auth.currentUser.uid;
-      const { chapterId, assignmentId, questionId } =
-        activeQuestion.originalPath;
-      const questionRef = doc(
-        db,
-        "users",
-        uid,
-        "chapters",
-        chapterId,
-        "assignments",
-        assignmentId,
-        "questions",
-        questionId,
-      );
-
-      // Check if tag already exists globally (case insensitive)
-      let existingTag = tags.find(
-        (t) => t.name.toLowerCase() === tagName.toLowerCase(),
-      );
-      let tagIdToUse;
-
-      if (existingTag) {
-        tagIdToUse = existingTag.id;
-        // Don't add if the question already has it
-        if ((activeQuestion.tags || []).includes(tagIdToUse)) return;
-
-        // 1. Update global tag count (+1)
-        const tagRef = doc(db, "users", uid, "tags", tagIdToUse);
-        await updateDoc(tagRef, { count: increment(1) });
-
-        // Update local tags state to reflect the +1 count
-        setTags((prev) =>
-          prev.map((t) =>
-            t.id === tagIdToUse ? { ...t, count: (t.count || 0) + 1 } : t,
-          ),
-        );
-      } else {
-        // Create brand new tag globally
-        const newTagRef = doc(collection(db, "users", uid, "tags"));
-        tagIdToUse = newTagRef.id;
-        const randomColor = COLORS[Math.floor(Math.random() * COLORS.length)];
-
-        const newTagObj = { name: tagName, color: randomColor, count: 1 };
-
-        // Use setDoc for brand new documents
-        await setDoc(newTagRef, newTagObj);
-
-        // Update local tags state
-        setTags((prev) => [...prev, { id: tagIdToUse, ...newTagObj }]);
-      }
-
-      // 2. Add tag to the specific Question
-      await updateDoc(questionRef, { tags: arrayUnion(tagIdToUse) });
-
-      // 3. Instantly update UI (Local Question State)
-      if (setQuestions) {
-        setQuestions((prev) =>
-          prev.map((q) =>
-            q.id === activeQuestion.id
-              ? { ...q, tags: [...(q.tags || []), tagIdToUse] }
-              : q,
-          ),
-        );
-      }
-    } catch (error) {
-      console.error("Failed to add tag:", error);
-      showToast("Failed to add tag", "error");
-    }
-  };
-
-  const handleRemoveTag = async (tagId) => {
-    try {
-      const uid = auth.currentUser.uid;
-      const { chapterId, assignmentId, questionId } =
-        activeQuestion.originalPath;
-
-      // 1. Remove from Question
-      const questionRef = doc(
-        db,
-        "users",
-        uid,
-        "chapters",
-        chapterId,
-        "assignments",
-        assignmentId,
-        "questions",
-        questionId,
-      );
-      await updateDoc(questionRef, { tags: arrayRemove(tagId) });
-
-      // 2. Update global tag count (-1)
-      const tagRef = doc(db, "users", uid, "tags", tagId);
-      await updateDoc(tagRef, { count: increment(-1) });
-
-      // 3. Update local states
-      setTags((prev) =>
-        prev.map((t) =>
-          t.id === tagId ? { ...t, count: Math.max(0, (t.count || 0) - 1) } : t,
-        ),
-      );
-
-      if (setQuestions) {
-        setQuestions((prev) =>
-          prev.map((q) =>
-            q.id === activeQuestion.id
-              ? { ...q, tags: (q.tags || []).filter((id) => id !== tagId) }
-              : q,
-          ),
-        );
-      }
-    } catch (error) {
-      console.error("Failed to remove tag:", error);
-      showToast("Failed to remove tag", "error");
-    }
-  };
 
   let sourceChapterName = "Unknown Chapter";
   let sourceAssignmentName = "Unknown Assignment";

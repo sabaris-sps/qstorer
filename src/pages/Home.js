@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState, useMemo } from "react";
+import { useContext, useEffect, useState, useMemo, useRef } from "react";
 import { AppContext } from "../App";
 import {
   collection,
@@ -12,6 +12,8 @@ import {
   updateDoc,
   arrayUnion,
   arrayRemove,
+  setDoc,
+  increment,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { deleteFromCloudinary, uploadToCloudinary } from "../cloudinary";
@@ -28,6 +30,8 @@ import { sanitizePublicId, parseNumberList, evaluateTagQuery } from "../utils";
 import FilterModal from "../components/FilterModal";
 import VirtualAssignmentModal from "../components/VirtualAssignmentModal";
 import ImportChapterModal from "../components/ImportChapterModal";
+import CommandCenter from "../components/CommandCenter";
+import { exportQuestionsToPDF } from "../utils";
 
 /* Toast component */
 function Toast({ toast }) {
@@ -106,6 +110,283 @@ export default function Home() {
   const [virtualModalEditData, setVirtualModalData] = useState(null);
 
   const [showImportChapterModal, setShowImportChapterModal] = useState(false);
+  const [showCommandCenter, setShowCommandCenter] = useState(false);
+  const commandFileInputRef = useRef(null);
+
+  const {
+    showTags,
+    setShowTags,
+    invertImages,
+    setInvertImages,
+    reloadChapters,
+    setTags,
+  } = useContext(AppContext);
+
+  // ==========================================
+  // TAG LOGIC (Moved from QuestionCard)
+  // ==========================================
+  const handleAddTag = async (tagName) => {
+    if (!activeQuestion) return showToast("Select a question first", "error");
+    try {
+      const uid = auth.currentUser.uid;
+      const { chapterId, assignmentId, questionId } =
+        activeQuestion.originalPath;
+      const questionRef = doc(
+        db,
+        "users",
+        uid,
+        "chapters",
+        chapterId,
+        "assignments",
+        assignmentId,
+        "questions",
+        questionId,
+      );
+
+      let existingTag = tags.find(
+        (t) => t.name.toLowerCase() === tagName.toLowerCase(),
+      );
+      let tagIdToUse;
+
+      const COLORS = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#b185db"];
+
+      if (existingTag) {
+        tagIdToUse = existingTag.id;
+        if ((activeQuestion.tags || []).includes(tagIdToUse)) return;
+        await updateDoc(doc(db, "users", uid, "tags", tagIdToUse), {
+          count: increment(1),
+        });
+        setTags((prev) =>
+          prev.map((t) =>
+            t.id === tagIdToUse ? { ...t, count: (t.count || 0) + 1 } : t,
+          ),
+        );
+      } else {
+        const newTagRef = doc(collection(db, "users", uid, "tags"));
+        tagIdToUse = newTagRef.id;
+        const randomColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+        const newTagObj = { name: tagName, color: randomColor, count: 1 };
+        await setDoc(newTagRef, newTagObj);
+        setTags((prev) => [...prev, { id: tagIdToUse, ...newTagObj }]);
+      }
+
+      await updateDoc(questionRef, { tags: arrayUnion(tagIdToUse) });
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === activeQuestion.id
+            ? { ...q, tags: [...(q.tags || []), tagIdToUse] }
+            : q,
+        ),
+      );
+      showToast(`Tag "${tagName}" added`);
+    } catch (error) {
+      console.error("Failed to add tag:", error);
+      showToast("Failed to add tag", "error");
+    }
+  };
+
+  const handleRemoveTag = async (tagId) => {
+    if (!activeQuestion) return;
+    try {
+      const uid = auth.currentUser.uid;
+      const { chapterId, assignmentId, questionId } =
+        activeQuestion.originalPath;
+      const questionRef = doc(
+        db,
+        "users",
+        uid,
+        "chapters",
+        chapterId,
+        "assignments",
+        assignmentId,
+        "questions",
+        questionId,
+      );
+
+      await updateDoc(questionRef, { tags: arrayRemove(tagId) });
+      await updateDoc(doc(db, "users", uid, "tags", tagId), {
+        count: increment(-1),
+      });
+
+      setTags((prev) =>
+        prev.map((t) =>
+          t.id === tagId ? { ...t, count: Math.max(0, (t.count || 0) - 1) } : t,
+        ),
+      );
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === activeQuestion.id
+            ? { ...q, tags: (q.tags || []).filter((id) => id !== tagId) }
+            : q,
+        ),
+      );
+      showToast("Tag removed");
+    } catch (error) {
+      console.error("Failed to remove tag:", error);
+      showToast("Failed to remove tag", "error");
+    }
+  };
+
+  // CommandCenter Handlers
+  const commandHandlers = {
+    handleCreateChapter: async (name) => {
+      if (!name.trim()) return;
+      const uid = auth.currentUser.uid;
+      await addDoc(collection(db, "users", uid, "chapters"), {
+        name: name.trim(),
+      });
+      showToast(`Chapter "${name}" created`);
+      await loadChaptersForUser();
+      if (reloadChapters) reloadChapters();
+    },
+    handleCreateAssignment: async (name, chapterName) => {
+      if (!name.trim()) return;
+      let targetChapterId = selectedChapter;
+      if (chapterName) {
+        const found = chapters.find(
+          (c) => c.name.toLowerCase() === chapterName.toLowerCase(),
+        );
+        if (found) targetChapterId = found.id;
+        else return showToast(`Chapter "${chapterName}" not found`, "error");
+      }
+      if (!targetChapterId) return showToast("Select a chapter first", "error");
+
+      const uid = auth.currentUser.uid;
+      await addDoc(
+        collection(
+          db,
+          "users",
+          uid,
+          "chapters",
+          targetChapterId,
+          "assignments",
+        ),
+        { name: name.trim() },
+      );
+      showToast(`Assignment "${name}" created`);
+      if (targetChapterId === selectedChapter) await loadAssignments();
+    },
+    handleExportAssignment: async (format, fileName) => {
+      if (!questions.length)
+        return showToast("No questions to export", "error");
+      const name =
+        fileName ||
+        assignments.find((a) => a.id === selectedAssignment)?.name ||
+        "questions";
+
+      if (format === "json") {
+        const dataToExport = questions.map((q, idx) => ({
+          number: idx + 1,
+          note: q.note || "",
+          images: q.images || [],
+          color: q.color || null,
+          tags: q.tags || [],
+        }));
+        const blob = new Blob([JSON.stringify(dataToExport, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${name}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("JSON Downloaded");
+      } else {
+        showToast("Generating PDF...");
+        await exportQuestionsToPDF(questions, name, { includeNotes: true });
+        showToast("PDF Downloaded");
+      }
+    },
+    handleGoTo: async (chapName, asgName) => {
+      const chap = chapters.find((c) =>
+        c.name.toLowerCase().includes(chapName.toLowerCase()),
+      );
+      if (!chap) return showToast(`Chapter "${chapName}" not found`, "error");
+
+      setSelectedChapter(chap.id);
+      if (asgName) {
+        // We need to wait for assignments to load or fetch them manually
+        const uid = auth.currentUser.uid;
+        const snap = await getDocs(
+          collection(db, "users", uid, "chapters", chap.id, "assignments"),
+        );
+        const asgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const asg = asgs.find((a) =>
+          a.name.toLowerCase().includes(asgName.toLowerCase()),
+        );
+        if (asg) setSelectedAssignment(asg.id);
+        else
+          showToast(
+            `Assignment "${asgName}" not found in ${chap.name}`,
+            "warning",
+          );
+      }
+      setShowCommandCenter(false);
+    },
+    handleReload: () => {
+      loadChaptersForUser();
+      if (selectedChapter) loadAssignments();
+      if (selectedAssignment) loadQuestions();
+      showToast("Reloaded");
+    },
+    handleCreateView: () => {
+      setVirtualModalData(null);
+      setShowVirtualModal(true);
+      setShowCommandCenter(false);
+    },
+    handleUpdateView: () => {
+      const currentAsg = assignments.find((a) => a.id === selectedAssignment);
+      if (!currentAsg?.isVirtual)
+        return showToast("Current assignment is not a virtual view", "error");
+      setVirtualModalData(currentAsg);
+      setShowVirtualModal(true);
+      setShowCommandCenter(false);
+    },
+    handleOpenAddQuestion: () => {
+      if (!selectedChapter || !selectedAssignment)
+        return showToast("Select chapter/assignment first", "error");
+      setActiveQuestionId(null);
+      setMode("create");
+      setShowCommandCenter(false);
+    },
+    handleToggleBulkAdd: () => {
+      // Toggle bulk is usually a switch in CreateQuestion, but we can set a flag
+      showToast("Bulk add mode is available in the + screen", "info");
+      commandHandlers.handleOpenAddQuestion();
+    },
+    handleToggleShowTags: () => {
+      setShowTags(!showTags);
+      showToast(`Tags ${!showTags ? "shown" : "hidden"}`);
+    },
+    handleToggleInvert: () => {
+      setInvertImages(!invertImages);
+      showToast(`Images ${!invertImages ? "inverted" : "restored"}`);
+    },
+    handleEditNames: () => {
+      if (!selectedChapter) return showToast("Select a chapter", "error");
+      setEditTab("chapter");
+      setChapterNameEdit(
+        chapters.find((c) => c.id === selectedChapter)?.name || "",
+      );
+      setAssignmentNameEdit(
+        assignments.find((a) => a.id === selectedAssignment)?.name || "",
+      );
+      setShowEditNamesPopup(true);
+      setShowCommandCenter(false);
+    },
+  };
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setShowCommandCenter((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
 
   // require login
   useEffect(() => {
@@ -1594,6 +1875,41 @@ export default function Home() {
       </section>
 
       <Toast toast={toast} />
+
+      <input
+        type="file"
+        accept=".json"
+        style={{ display: "none" }}
+        ref={commandFileInputRef}
+        onChange={(e) => {
+          const file = e.target.files[0];
+          if (file) handleImportJSON(file);
+          if (commandFileInputRef.current)
+            commandFileInputRef.current.value = "";
+        }}
+      />
+
+      <CommandCenter
+        isOpen={showCommandCenter}
+        onClose={() => setShowCommandCenter(false)}
+        activeQuestion={activeQuestion}
+        visibleQuestions={visibleQuestions}
+        showToast={showToast}
+        currentToast={toast}
+        assignmentsByChapter={assignmentsByChapter}
+        {...commandHandlers}
+        handleImportJSON={() => commandFileInputRef.current?.click()}
+        handleImportChapter={() => setShowImportChapterModal(true)}
+        handleDeleteAssignment={() =>
+          handleDeleteAssignment(selectedAssignment)
+        }
+        handleDeleteChapter={() => handleDeleteChapter(selectedChapter)}
+        handleUpdateColor={handleUpdateColor}
+        handleAddTag={handleAddTag}
+        handleRemoveTag={handleRemoveTag}
+        handleSaveNote={handleSaveNote}
+        handleUploadMore={handleUploadMoreImages}
+      />
     </div>
   );
 }

@@ -77,7 +77,22 @@ export default function App() {
     localStorage.setItem("showTags", showTags);
   }, [showTags]);
 
-  async function reloadChapters() {}
+  async function reloadChapters() {
+    if (!user) return;
+    try {
+      const snap = await getDocs(collection(db, "users", user.uid, "chapters"));
+      const chaps = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setChapters(chaps);
+    } catch (error) {
+      console.error("Failed to reload chapters:", error);
+    }
+  }
+
+  useEffect(() => {
+    if (user) {
+      reloadChapters();
+    }
+  }, [user]);
 
   async function handleLogout() {
     await signOut(auth);
@@ -97,10 +112,11 @@ export default function App() {
         user,
         invertImages,
         setInvertImages,
-        showTags, // Pass to context
-        tags, // Pass to context
-        setTags, // Pass to context
-        loadTags, // Pass to context
+        showTags,
+        setShowTags, // ADDED
+        tags,
+        setTags,
+        loadTags,
       }}
     >
       <div className="app-root">
