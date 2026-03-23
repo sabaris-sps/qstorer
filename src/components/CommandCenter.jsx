@@ -1,21 +1,22 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import { AppContext } from '../App';
 import './CommandCenter.css';
+import { evaluateTagQuery, parseNumberList } from '../utils';
+import { db, auth } from '../firebase';
+import {collection, getDocs } from 'firebase/firestore'
 
 /**
  * Parses a command string into arguments, supporting quotes and escapes.
- * E.g. go to "Chapter One" "Assignment Two" -> ["go", "to", "Chapter One", "Assignment Two"]
  */
 const parseCommandArgs = (input) => {
   const args = [];
   let current = '';
   let inQuotes = false;
-  let quoteChar = null; // Track which quote char started the block
+  let quoteChar = null;
   let escaped = false;
 
   for (let i = 0; i < input.length; i++) {
     const char = input[i];
-
     if (escaped) {
       current += char;
       escaped = false;
@@ -67,16 +68,23 @@ const CommandCenter = ({
   handleRemoveTag,
   handleSaveNote,
   handleUploadMore,
+  handleSwapQuestions,
+  handleJumpTo,
+  handleShowStats,
+  handleSaveAdvancedView,
   showToast,
   activeQuestion,
   visibleQuestions,
   currentToast,
   assignmentsByChapter,
+  aliases,
+  saveAlias,
+  deleteAlias,
 }) => {
   const [input, setInput] = useState('');
   const [results, setResults] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [history, setHistory] = useState([]); // Display logs/toasts at bottom
+  const [history, setHistory] = useState([]);
   const [commandHistory, setCommandHistory] = useState(() => {
     const saved = localStorage.getItem('cc_command_history');
     return saved ? JSON.parse(saved) : [];
@@ -88,12 +96,10 @@ const CommandCenter = ({
   const resultsRef = useRef(null);
   const historyRef = useRef(null);
 
-  // Persist command history to localStorage
   useEffect(() => {
     localStorage.setItem('cc_command_history', JSON.stringify(commandHistory));
   }, [commandHistory]);
 
-  // Auto-scroll selected item into view in results
   useEffect(() => {
     const selected = resultsRef.current?.querySelector('.command-item.selected');
     if (selected) {
@@ -101,21 +107,131 @@ const CommandCenter = ({
     }
   }, [selectedIndex, results]);
 
-  // Auto-scroll logs/history to bottom when updated
   useEffect(() => {
     if (historyRef.current) {
       historyRef.current.scrollTop = historyRef.current.scrollHeight;
     }
   }, [history]);
 
-  // Capture global toasts
   useEffect(() => {
     if (currentToast && isOpen) {
       addToHistory(currentToast.message, currentToast.type === 'error' ? 'error' : 'success');
     }
   }, [currentToast, isOpen]);
 
-  const commands = [
+  const baseCommands = [
+    {
+      name: 'alias',
+      desc: 'alias <name> <command>',
+      action: (args) => {
+          if (args.length < 3) return addToHistory("Usage: alias <name> <command>", "error");
+          const name = args[1];
+          const cmd = args.slice(2).join(' ');
+          saveAlias(name, cmd);
+          addToHistory(`Alias "${name}" saved for "${cmd}"`);
+      }
+    },
+    {
+        name: 'alias list',
+        desc: 'list all saved aliases',
+        action: () => {
+            if (!aliases?.length) return addToHistory("No aliases saved", "info");
+            const list = aliases.map(a => `${a.name} -> ${a.command}`).join('; ');
+            addToHistory(`Aliases: ${list}`, "info");
+        }
+    },
+    {
+      name: 'unalias',
+      desc: 'unalias <name>',
+      action: (args) => {
+          if (!args[1]) return addToHistory("Usage: unalias <name>", "error");
+          deleteAlias(args[1]);
+          addToHistory(`Alias "${args[1]}" deleted`);
+      }
+    },
+    {
+      name: 'stats',
+      desc: 'stats [global]',
+      action: (args) => {
+          const isGlobal = args[1] === 'global';
+          if (isGlobal) {
+              const totalChaps = chapters.length;
+              const totalTags = tags.length;
+              addToHistory(`Global Stats: Chapters: ${totalChaps}, Tags: ${totalTags}`, "info");
+          } else {
+              const msg = handleShowStats();
+              addToHistory(msg, "info");
+          }
+      }
+    },
+    {
+      name: 'jump',
+      desc: 'jump <number>',
+      action: (args) => {
+          const num = parseInt(args[1]);
+          if (isNaN(num)) return addToHistory("Invalid number", "error");
+          handleJumpTo(num);
+      }
+    },
+    {
+      name: 'swap',
+      desc: 'swap <num1> <num2>',
+      action: (args) => {
+          const n1 = parseInt(args[1]);
+          const n2 = parseInt(args[2]);
+          if (isNaN(n1) || isNaN(n2)) return addToHistory("Usage: swap <num1> <num2>", "error");
+          handleSwapQuestions(n1, n2);
+      }
+    },
+    {
+      name: 'view create',
+      desc: 'view create "Name" where ...',
+      action: async (args) => {
+          const name = args[2];
+          const whereIdx = args.indexOf('where');
+          if (whereIdx === -1 || !name) return addToHistory('Usage: view create "Name" where tag=\'name\'', "error");
+          
+          const clause = args.slice(whereIdx + 1).join(' ');
+          addToHistory(`Scanning database for: ${clause}...`, "info");
+          
+          try {
+              const uid = auth.currentUser.uid;
+              let collectedRefs = [];
+              
+              for (const chap of chapters) {
+                  const asgs = assignmentsByChapter[chap.id] || [];
+                  for (const asg of asgs) {
+                      if (asg.isVirtual) continue;
+                      
+                      const qSnap = await getDocs(collection(db, "users", uid, "chapters", chap.id, "assignments", asg.id, "questions"));
+                      qSnap.docs.forEach(dSnap => {
+                          const data = dSnap.data();
+                          const questionTagNames = (data.tags || []).map(tid => tags.find(t => t.id === tid)?.name).filter(Boolean);
+                          
+                          let matches = true;
+                          if (clause.includes("tag='")) {
+                              const targetTag = clause.split("tag='")[1].split("'")[0];
+                              matches = matches && questionTagNames.includes(targetTag);
+                          }
+                          if (clause.includes("color='")) {
+                              const targetColor = clause.split("color='")[1].split("'")[0];
+                              matches = matches && (data.color || 'none') === targetColor;
+                          }
+                          
+                          if (matches) {
+                              collectedRefs.push({ chapterId: chap.id, assignmentId: asg.id, questionId: dSnap.id });
+                          }
+                      });
+                  }
+              }
+              
+              if (collectedRefs.length === 0) return addToHistory("No questions matched", "warning");
+              await handleSaveAdvancedView(name, collectedRefs, { mode: 'advanced', clause });
+          } catch (e) {
+              addToHistory("Failed to create view: " + e.message, "error");
+          }
+      }
+    },
     {
       name: 'dir',
       desc: 'dir global | dir <chapter>',
@@ -321,6 +437,18 @@ const CommandCenter = ({
     }
   ];
 
+  // Dynamic command list (Base + Aliases)
+  const allCommands = useMemo(() => {
+      const aliasCommands = (aliases || []).map(a => ({
+          name: a.name,
+          desc: `Alias for: ${a.command}`,
+          isAlias: true,
+          originalCommand: a.command,
+          action: () => {} // Action handled in Enter logic
+      }));
+      return [...baseCommands, ...aliasCommands].sort((a, b) => a.name.localeCompare(b.name));
+  }, [aliases]);
+
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -332,21 +460,50 @@ const CommandCenter = ({
 
   useEffect(() => {
     if (!input) {
-      setResults(commands);
+      setResults(allCommands);
       return;
     }
 
-    const filtered = commands.filter(c => 
+    const filtered = allCommands.filter(c => 
       c.name.toLowerCase().includes(input.toLowerCase()) ||
       input.toLowerCase().startsWith(c.name.toLowerCase())
     );
     setResults(filtered);
     setSelectedIndex(0);
-  }, [input]);
+  }, [input, allCommands]);
 
   const addToHistory = (text, type = 'success') => {
-    // Append to bottom
     setHistory(prev => [...prev, { text, type, time: new Date().toLocaleTimeString() }].slice(-50));
+  };
+
+  const executeCommand = (cmdInput) => {
+      const args = parseCommandArgs(cmdInput);
+      const firstWord = args[0]?.toLowerCase();
+      
+      // Check for alias expansion again just in case
+      const alias = (aliases || []).find(a => a.name === firstWord);
+      const finalInput = alias ? alias.command + cmdInput.substring(firstWord.length) : cmdInput;
+      const finalArgs = parseCommandArgs(finalInput);
+      const finalFirstWord = finalArgs[0]?.toLowerCase();
+
+      // Find the command that matches the longest part of the start
+      // e.g. "alias list" should match "alias list" not just "alias"
+      const matchedCommand = baseCommands
+        .filter(c => finalInput.toLowerCase().startsWith(c.name.toLowerCase()))
+        .sort((a, b) => b.name.length - a.name.length)[0];
+
+      if (matchedCommand) {
+          if (cmdInput.trim()) {
+              setCommandHistory(prev => [...prev.filter(c => c !== cmdInput), cmdInput].slice(-50));
+          }
+          if (!confirming) {
+              addToHistory(`Executed: ${matchedCommand.name}`);
+              setInput('');
+          }
+          matchedCommand.action(finalArgs);
+      } else {
+          addToHistory(`Unknown command: ${finalFirstWord}`, "error");
+      }
   };
 
   const handleKeyDown = (e) => {
@@ -367,25 +524,20 @@ const CommandCenter = ({
           return;
       }
       
-      const currentCommand = results[selectedIndex];
-      if (currentCommand) {
-        const args = parseCommandArgs(input);
-        const cmdParts = currentCommand.name.split(' ');
-        const matches = cmdParts.every((part, i) => args[i]?.toLowerCase() === part.toLowerCase());
-        if (matches) {
-            // Log command to history if it has content
-            if (input.trim()) {
-                setCommandHistory(prev => [...prev.filter(c => c !== input), input].slice(-50));
-            }
-            if (!confirming) {
-                addToHistory(`Executed: ${currentCommand.name}`);
-                setInput('');
-            }
-            currentCommand.action(args);
-        } else {
-            setInput(currentCommand.name + ' ');
-            addToHistory(`Complete the command: ${currentCommand.desc}`, 'info');
-        }
+      const selected = results[selectedIndex];
+      if (selected) {
+          // If the typed input exactly matches or is an expansion, execute it
+          // Otherwise, auto-complete the suggestion
+          const typedFirstWord = input.split(' ')[0].toLowerCase();
+          const isExactMatch = results.some(r => r.name.toLowerCase() === input.toLowerCase());
+          const isStartingWith = selected.name.toLowerCase().startsWith(input.toLowerCase());
+
+          if (isExactMatch || !isStartingWith) {
+              executeCommand(input);
+          } else {
+              setInput(selected.name + ' ');
+              addToHistory(`Complete the command: ${selected.desc}`, 'info');
+          }
       }
     }
   };
@@ -415,12 +567,10 @@ const CommandCenter = ({
               <input
                 ref={inputRef}
                 className="command-input"
-                placeholder="Type a command (dir, history, go to, etc.)..."
+                placeholder="Type a command (dir, alias list, stats, etc.)..."
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={(e) => {
-                    // Allow arrow keys to work inside input if not at boundaries or just stop propagation
-                    // to prevent Home.js from intercepting them for question navigation
                     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
                         e.stopPropagation();
                     } else {
@@ -428,7 +578,7 @@ const CommandCenter = ({
                     }
                 }}
                 onPaste={(e) => {
-                    e.stopPropagation(); // Ensure paste works
+                    e.stopPropagation();
                 }}
               />
             </div>
@@ -444,7 +594,10 @@ const CommandCenter = ({
                         inputRef.current?.focus();
                     }}
                   >
-                    <span className="command-name">{c.name}</span>
+                    <span className="command-name">
+                        {c.isAlias && <span style={{ color: 'var(--secondary)', fontSize: '0.7rem', marginRight: '8px' }}>[ALIAS]</span>}
+                        {c.name}
+                    </span>
                     <span className="command-desc">{c.desc}</span>
                   </div>
                 ))
@@ -465,7 +618,7 @@ const CommandCenter = ({
 
             <div className="command-center-help">
                 <div>↑↓ to navigate • Enter to execute • Esc to close</div>
-                <div>Use quotes for multi-word names: <span className="kbd-shortcut">go to "Chapter 1"</span></div>
+                <div>Aliases: <span className="kbd-shortcut">alias mt "go to Maths"</span></div>
             </div>
           </>
         )}

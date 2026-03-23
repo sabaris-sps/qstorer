@@ -7,7 +7,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import TagManager from "./pages/TagManager"; // NEW IMPORT
 import { auth, db } from "./firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import "./App.css";
 
@@ -18,9 +18,8 @@ export default function App() {
   const [selectedChapter, setSelectedChapter] = useState("");
   const [selectedAssignment, setSelectedAssignment] = useState("");
   const [user, setUser] = useState(null);
-
-  // NEW: Global Tags state
   const [tags, setTags] = useState([]);
+  const [aliases, setAliases] = useState([]);
 
   const navigate = useNavigate();
 
@@ -29,7 +28,6 @@ export default function App() {
     return saved === "true";
   });
 
-  // NEW: Show/Hide Tags toggle
   const [showTags, setShowTags] = useState(() => {
     const saved = localStorage.getItem("showTags");
     return saved !== "false"; // Default to true
@@ -41,15 +39,16 @@ export default function App() {
       setSelectedChapter("");
       setSelectedAssignment("");
       if (u) {
-        loadTags(u.uid); // Load tags on login
+        loadTags(u.uid);
+        loadAliases(u.uid);
       } else {
         setTags([]);
+        setAliases([]);
       }
     });
     return () => unsub();
   }, []);
 
-  // NEW: Load global tags
   const loadTags = async (uid) => {
     try {
       const snap = await getDocs(collection(db, "users", uid, "tags"));
@@ -63,6 +62,37 @@ export default function App() {
     }
   };
 
+  const loadAliases = async (uid) => {
+    if (!uid) return;
+    try {
+      const snap = await getDocs(collection(db, "users", uid, "aliases"));
+      const arr = snap.docs.map(doc => ({ name: doc.id, command: doc.data().command }));
+      setAliases(arr);
+    } catch (error) {
+      console.error("Failed to load aliases:", error);
+    }
+  };
+
+  async function saveAlias(name, command) {
+    if (!user) return;
+    try {
+      await setDoc(doc(db, "users", user.uid, "aliases", name), { command });
+      setAliases(prev => [...prev.filter(a => a.name !== name), { name, command }]);
+    } catch (error) {
+      console.error("Failed to save alias:", error);
+    }
+  }
+
+  async function deleteAlias(name) {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, "users", user.uid, "aliases", name));
+      setAliases(prev => prev.filter(a => a.name !== name));
+    } catch (error) {
+      console.error("Failed to delete alias:", error);
+    }
+  }
+
   useEffect(() => {
     localStorage.setItem("invertImages", invertImages);
     if (invertImages) {
@@ -72,7 +102,6 @@ export default function App() {
     }
   }, [invertImages]);
 
-  // NEW: Sync showTags with local storage
   useEffect(() => {
     localStorage.setItem("showTags", showTags);
   }, [showTags]);
@@ -113,10 +142,13 @@ export default function App() {
         invertImages,
         setInvertImages,
         showTags,
-        setShowTags, // ADDED
+        setShowTags,
         tags,
         setTags,
         loadTags,
+        aliases,
+        saveAlias,
+        deleteAlias,
       }}
     >
       <div className="app-root">

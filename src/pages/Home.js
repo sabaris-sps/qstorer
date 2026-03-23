@@ -14,6 +14,7 @@ import {
   arrayRemove,
   setDoc,
   increment,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { deleteFromCloudinary, uploadToCloudinary } from "../cloudinary";
@@ -120,6 +121,9 @@ export default function Home() {
     setInvertImages,
     reloadChapters,
     setTags,
+    aliases,
+    saveAlias,
+    deleteAlias,
   } = useContext(AppContext);
 
   // ==========================================
@@ -389,6 +393,66 @@ export default function Home() {
       setShowEditNamesPopup(true);
       setShowCommandCenter(false);
     },
+    handleSwapQuestions: async (num1, num2) => {
+      if (isCurrentlyVirtual) return showToast("Cannot swap in virtual view", "error");
+      const q1 = questions.find(q => q.number === num1);
+      const q2 = questions.find(q => q.number === num2);
+      if (!q1 || !q2) return showToast("Question not found", "error");
+
+      try {
+        const uid = auth.currentUser.uid;
+        const batch = writeBatch(db);
+        const ref1 = doc(db, "users", uid, "chapters", selectedChapter, "assignments", selectedAssignment, "questions", q1.id);
+        const ref2 = doc(db, "users", uid, "chapters", selectedChapter, "assignments", selectedAssignment, "questions", q2.id);
+        
+        batch.update(ref1, { number: num2 });
+        batch.update(ref2, { number: num1 });
+        await batch.commit();
+        showToast(`Swapped #${num1} and #${num2}`);
+        await loadQuestions();
+      } catch (e) {
+        showToast("Swap failed", "error");
+      }
+    },
+    handleJumpTo: (num) => {
+      const q = questions.find(q => q.number === num);
+      if (q) {
+        handleSelectQuestion(q.id);
+        setTimeout(() => {
+            const el = document.getElementById(`q-btn-${q.id}`);
+            el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      } else {
+        showToast(`Question #${num} not found`, "error");
+      }
+    },
+    handleShowStats: () => {
+        const totalQ = questions.length;
+        const colorCounts = questions.reduce((acc, q) => {
+            const c = q.color || 'none';
+            acc[c] = (acc[c] || 0) + 1;
+            return acc;
+        }, {});
+        
+        let msg = `Stats for current assignment: Total: ${totalQ} questions. `;
+        msg += Object.entries(colorCounts).map(([c, count]) => `${c}: ${count}`).join(', ');
+        return msg;
+    },
+    handleSaveAdvancedView: async (viewName, refs, config) => {
+        try {
+            const uid = auth.currentUser.uid;
+            await addDoc(collection(db, "users", uid, "chapters", selectedChapter, "assignments"), {
+                name: viewName,
+                isVirtual: true,
+                refs,
+                config
+            });
+            showToast(`Virtual view "${viewName}" created`);
+            await loadAssignments();
+        } catch (e) {
+            showToast("Failed to create view", "error");
+        }
+    }
   };
 
   useEffect(() => {
@@ -1920,6 +1984,9 @@ export default function Home() {
         showToast={showToast}
         currentToast={toast}
         assignmentsByChapter={assignmentsByChapter}
+        aliases={aliases}
+        saveAlias={saveAlias}
+        deleteAlias={deleteAlias}
         {...commandHandlers}
         handleImportJSON={() => commandFileInputRef.current?.click()}
         handleImportChapter={() => setShowImportChapterModal(true)}
