@@ -299,28 +299,42 @@ export default function Home() {
       }
     },
     handleGoTo: async (chapName, asgName) => {
-      const chap = chapters.find((c) =>
-        c.name.toLowerCase().includes(chapName.toLowerCase()),
-      );
+      // Best match for Chapter
+      const chap = chapters
+        .map(c => ({ 
+          ...c, 
+          score: c.name.toLowerCase().includes(chapName.toLowerCase()) ? c.name.length : 0 
+        }))
+        .filter(c => c.score > 0)
+        .sort((a, b) => b.score - a.score)[0];
+
       if (!chap) return showToast(`Chapter "${chapName}" not found`, "error");
 
       setSelectedChapter(chap.id);
+      
       if (asgName) {
-        // We need to wait for assignments to load or fetch them manually
         const uid = auth.currentUser.uid;
         const snap = await getDocs(
           collection(db, "users", uid, "chapters", chap.id, "assignments"),
         );
         const asgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        const asg = asgs.find((a) =>
-          a.name.toLowerCase().includes(asgName.toLowerCase()),
-        );
-        if (asg) setSelectedAssignment(asg.id);
-        else
-          showToast(
-            `Assignment "${asgName}" not found in ${chap.name}`,
-            "warning",
-          );
+        
+        // Best match for Assignment
+        const asg = asgs
+          .map(a => ({ 
+            ...a, 
+            score: a.name.toLowerCase().includes(asgName.toLowerCase()) ? a.name.length : 0 
+          }))
+          .filter(a => a.score > 0)
+          .sort((a, b) => b.score - a.score)[0];
+
+        if (asg) {
+          // IMPORTANT: Manually trigger load with the specific assignment to prevent it being cleared
+          await loadAssignments(chap.id, asg.id);
+          setSelectedAssignment(asg.id);
+        } else {
+          showToast(`Assignment "${asgName}" not found in ${chap.name}. Only Chapter opened.`, "warning");
+        }
       }
       setShowCommandCenter(false);
     },
@@ -456,18 +470,14 @@ export default function Home() {
     }
   }
 
-  async function loadAssignments() {
+  async function loadAssignments(freshChapterId = null, keepAssignmentId = null) {
     try {
       const uid = auth.currentUser.uid;
+      const targetChapId = freshChapterId || selectedChapter;
+      if (!targetChapId) return [];
+
       const snap = await getDocs(
-        collection(
-          db,
-          "users",
-          uid,
-          "chapters",
-          selectedChapter,
-          "assignments",
-        ),
+        collection(db, "users", uid, "chapters", targetChapId, "assignments"),
       );
       const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       const sorted = arr.sort((a, b) =>
@@ -478,12 +488,15 @@ export default function Home() {
       );
       setAssignments(sorted);
 
-      if (!sorted.find((a) => a.id === selectedAssignment))
+      const effectiveAsgId = keepAssignmentId || selectedAssignment;
+      if (!sorted.find((a) => a.id === effectiveAsgId)) {
         setSelectedAssignment("");
+      }
 
       return sorted;
     } catch (e) {
       console.error(e);
+      return [];
     }
   }
 
@@ -1435,6 +1448,16 @@ export default function Home() {
 
   useEffect(() => {
     function handleKeyDown(e) {
+      // Prevent navigation if user is typing in any input/textarea
+      const target = e.target;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
       // 1. Handle Question Navigation (Arrow Left/Right)
       if (!e.altKey && e.key === "ArrowRight") {
         e.preventDefault();

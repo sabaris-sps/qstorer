@@ -60,6 +60,7 @@
 }
 
 .command-results {
+  position: relative;
   max-height: 250px;
   overflow-y: auto;
   background: var(--bg-light);

@@ -28,6 +28,11 @@ export default function NoteEditor({ value, onChange, placeholder, rows = 4 }) {
           <textarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            onKeyDown={(e) => {
+                if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                    e.stopPropagation();
+                }
+            }}
             placeholder={placeholder}
             rows={rows}
             style={{ width: "100%", boxSizing: "border-box" }}

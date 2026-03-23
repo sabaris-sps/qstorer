@@ -10,6 +10,7 @@ const parseCommandArgs = (input) => {
   const args = [];
   let current = '';
   let inQuotes = false;
+  let quoteChar = null; // Track which quote char started the block
   let escaped = false;
 
   for (let i = 0; i < input.length; i++) {
@@ -20,8 +21,14 @@ const parseCommandArgs = (input) => {
       escaped = false;
     } else if (char === '\\') {
       escaped = true;
-    } else if (char === '"') {
-      inQuotes = !inQuotes;
+    } else if ((char === '"' || char === "'") && (!inQuotes || char === quoteChar)) {
+      if (!inQuotes) {
+        inQuotes = true;
+        quoteChar = char;
+      } else {
+        inQuotes = false;
+        quoteChar = null;
+      }
     } else if (char === ' ' && !inQuotes) {
       if (current) {
         args.push(current);
@@ -88,16 +95,9 @@ const CommandCenter = ({
 
   // Auto-scroll selected item into view in results
   useEffect(() => {
-    const container = resultsRef.current;
-    const selected = container?.querySelector('.command-item.selected');
-    if (selected && container) {
-      const { offsetTop, offsetHeight } = selected;
-      const { scrollTop, clientHeight } = container;
-      if (offsetTop < scrollTop) {
-        container.scrollTop = offsetTop;
-      } else if (offsetTop + offsetHeight > scrollTop + clientHeight) {
-        container.scrollTop = offsetTop + offsetHeight - clientHeight;
-      }
+    const selected = resultsRef.current?.querySelector('.command-item.selected');
+    if (selected) {
+      selected.scrollIntoView({ block: 'nearest', behavior: 'auto' });
     }
   }, [selectedIndex, results]);
 
@@ -418,7 +418,18 @@ const CommandCenter = ({
                 placeholder="Type a command (dir, history, go to, etc.)..."
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
+                onKeyDown={(e) => {
+                    // Allow arrow keys to work inside input if not at boundaries or just stop propagation
+                    // to prevent Home.js from intercepting them for question navigation
+                    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                        e.stopPropagation();
+                    } else {
+                        handleKeyDown(e);
+                    }
+                }}
+                onPaste={(e) => {
+                    e.stopPropagation(); // Ensure paste works
+                }}
               />
             </div>
             

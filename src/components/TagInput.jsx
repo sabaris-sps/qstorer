@@ -57,6 +57,8 @@ export default function TagInput({
       setSuggestions([]);
     } else if (e.key === "Backspace" && !inputValue && activeTags.length > 0) {
       onRemoveTag(activeTags[activeTags.length - 1].id);
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.stopPropagation();
     }
   };
 
