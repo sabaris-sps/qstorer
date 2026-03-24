@@ -305,31 +305,35 @@ export default function Home() {
     handleGoTo: async (chapName, asgName) => {
       // Best match for Chapter
       const chap = chapters
-        .map(c => ({ 
-          ...c, 
-          score: c.name.toLowerCase().includes(chapName.toLowerCase()) ? c.name.length : 0 
+        .map((c) => ({
+          ...c,
+          score: c.name.toLowerCase().includes(chapName.toLowerCase())
+            ? c.name.length
+            : 0,
         }))
-        .filter(c => c.score > 0)
+        .filter((c) => c.score > 0)
         .sort((a, b) => b.score - a.score)[0];
 
       if (!chap) return showToast(`Chapter "${chapName}" not found`, "error");
 
       setSelectedChapter(chap.id);
-      
+
       if (asgName) {
         const uid = auth.currentUser.uid;
         const snap = await getDocs(
           collection(db, "users", uid, "chapters", chap.id, "assignments"),
         );
         const asgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        
+
         // Best match for Assignment
         const asg = asgs
-          .map(a => ({ 
-            ...a, 
-            score: a.name.toLowerCase().includes(asgName.toLowerCase()) ? a.name.length : 0 
+          .map((a) => ({
+            ...a,
+            score: a.name.toLowerCase().includes(asgName.toLowerCase())
+              ? a.name.length
+              : 0,
           }))
-          .filter(a => a.score > 0)
+          .filter((a) => a.score > 0)
           .sort((a, b) => b.score - a.score)[0];
 
         if (asg) {
@@ -337,7 +341,10 @@ export default function Home() {
           await loadAssignments(chap.id, asg.id);
           setSelectedAssignment(asg.id);
         } else {
-          showToast(`Assignment "${asgName}" not found in ${chap.name}. Only Chapter opened.`, "warning");
+          showToast(
+            `Assignment "${asgName}" not found in ${chap.name}. Only Chapter opened.`,
+            "warning",
+          );
         }
       }
       setShowCommandCenter(false);
@@ -394,17 +401,38 @@ export default function Home() {
       setShowCommandCenter(false);
     },
     handleSwapQuestions: async (num1, num2) => {
-      if (isCurrentlyVirtual) return showToast("Cannot swap in virtual view", "error");
-      const q1 = questions.find(q => q.number === num1);
-      const q2 = questions.find(q => q.number === num2);
+      if (isCurrentlyVirtual)
+        return showToast("Cannot swap in virtual view", "error");
+      const q1 = questions.find((q) => q.number === num1);
+      const q2 = questions.find((q) => q.number === num2);
       if (!q1 || !q2) return showToast("Question not found", "error");
 
       try {
         const uid = auth.currentUser.uid;
         const batch = writeBatch(db);
-        const ref1 = doc(db, "users", uid, "chapters", selectedChapter, "assignments", selectedAssignment, "questions", q1.id);
-        const ref2 = doc(db, "users", uid, "chapters", selectedChapter, "assignments", selectedAssignment, "questions", q2.id);
-        
+        const ref1 = doc(
+          db,
+          "users",
+          uid,
+          "chapters",
+          selectedChapter,
+          "assignments",
+          selectedAssignment,
+          "questions",
+          q1.id,
+        );
+        const ref2 = doc(
+          db,
+          "users",
+          uid,
+          "chapters",
+          selectedChapter,
+          "assignments",
+          selectedAssignment,
+          "questions",
+          q2.id,
+        );
+
         batch.update(ref1, { number: num2 });
         batch.update(ref2, { number: num1 });
         await batch.commit();
@@ -415,44 +443,56 @@ export default function Home() {
       }
     },
     handleJumpTo: (num) => {
-      const q = questions.find(q => q.number === num);
+      const q = questions.find((q) => q.number === num);
       if (q) {
         handleSelectQuestion(q.id);
         setTimeout(() => {
-            const el = document.getElementById(`q-btn-${q.id}`);
-            el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const el = document.getElementById(`q-btn-${q.id}`);
+          el?.scrollIntoView({ behavior: "smooth", block: "center" });
         }, 100);
       } else {
         showToast(`Question #${num} not found`, "error");
       }
     },
     handleShowStats: () => {
-        const totalQ = questions.length;
-        const colorCounts = questions.reduce((acc, q) => {
-            const c = q.color || 'none';
-            acc[c] = (acc[c] || 0) + 1;
-            return acc;
-        }, {});
-        
-        let msg = `Stats for current assignment: Total: ${totalQ} questions. `;
-        msg += Object.entries(colorCounts).map(([c, count]) => `${c}: ${count}`).join(', ');
-        return msg;
+      const totalQ = questions.length;
+      const colorCounts = questions.reduce((acc, q) => {
+        const c = q.color || "none";
+        acc[c] = (acc[c] || 0) + 1;
+        return acc;
+      }, {});
+
+      let msg = `Stats for current assignment: Total: ${totalQ} questions. `;
+      msg += Object.entries(colorCounts)
+        .map(([c, count]) => `${c}: ${count}`)
+        .join(", ");
+      return msg;
     },
     handleSaveAdvancedView: async (viewName, refs, config) => {
-        try {
-            const uid = auth.currentUser.uid;
-            await addDoc(collection(db, "users", uid, "chapters", selectedChapter, "assignments"), {
-                name: viewName,
-                isVirtual: true,
-                refs,
-                config
-            });
-            showToast(`Virtual view "${viewName}" created`);
-            await loadAssignments();
-        } catch (e) {
-            showToast("Failed to create view", "error");
-        }
-    }
+      try {
+        const uid = auth.currentUser.uid;
+        await addDoc(
+          collection(
+            db,
+            "users",
+            uid,
+            "chapters",
+            selectedChapter,
+            "assignments",
+          ),
+          {
+            name: viewName,
+            isVirtual: true,
+            refs,
+            config,
+          },
+        );
+        showToast(`Virtual view "${viewName}" created`);
+        await loadAssignments();
+      } catch (e) {
+        showToast("Failed to create view", "error");
+      }
+    },
   };
 
   useEffect(() => {
@@ -534,7 +574,10 @@ export default function Home() {
     }
   }
 
-  async function loadAssignments(freshChapterId = null, keepAssignmentId = null) {
+  async function loadAssignments(
+    freshChapterId = null,
+    keepAssignmentId = null,
+  ) {
     try {
       const uid = auth.currentUser.uid;
       const targetChapId = freshChapterId || selectedChapter;
@@ -1955,6 +1998,8 @@ export default function Home() {
             setIsCopyMode={setIsCopyMode}
             isVirtual={isCurrentlyVirtual}
             setQuestions={setQuestions}
+            handleAddTag={handleAddTag}
+            handleRemoveTag={handleRemoveTag}
           />
         ) : (
           <div className="placeholder">Select a question number</div>
