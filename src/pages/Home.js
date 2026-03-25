@@ -271,7 +271,7 @@ export default function Home() {
       if (targetChapterId === selectedChapter) await loadAssignments();
     },
     handleExportAssignment: async (format, fileName) => {
-      if (!questions.length)
+      if (!visibleQuestions.length)
         return showToast("No questions to export", "error");
       const name =
         fileName ||
@@ -279,7 +279,7 @@ export default function Home() {
         "questions";
 
       if (format === "json") {
-        const dataToExport = questions.map((q, idx) => ({
+        const dataToExport = visibleQuestions.map((q, idx) => ({
           number: idx + 1,
           note: q.note || "",
           images: q.images || [],
@@ -298,7 +298,7 @@ export default function Home() {
         showToast("JSON Downloaded");
       } else {
         showToast("Generating PDF...");
-        await exportQuestionsToPDF(questions, name, { includeNotes: true });
+        await exportQuestionsToPDF(visibleQuestions, name, { includeNotes: true });
         showToast("PDF Downloaded");
       }
     },
