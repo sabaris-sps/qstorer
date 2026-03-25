@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import { AppContext } from '../App';
 import './CommandCenter.css';
-import { evaluateTagQuery, parseNumberList } from '../utils';
 import { db, auth } from '../firebase';
 import {collection, getDocs } from 'firebase/firestore'
 
@@ -563,7 +562,7 @@ const CommandCenter = ({
         ) : (
           <>
             <div className="command-input-wrapper">
-              <span className="command-icon">></span>
+              <span className="command-icon">{">"}</span>
               <input
                 ref={inputRef}
                 className="command-input"
