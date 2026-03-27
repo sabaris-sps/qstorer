@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import { AppContext } from '../App';
 import './CommandCenter.css';
 import { db, auth } from '../firebase';
-import {collection, getDocs } from 'firebase/firestore'
+import {collection, getDocs, query, where } from 'firebase/firestore'
 
 /**
  * Parses a command string into arguments, supporting quotes and escapes.
@@ -197,12 +197,22 @@ const CommandCenter = ({
               const uid = auth.currentUser.uid;
               let collectedRefs = [];
               
+              const colorMatch = clause.match(/color='([^']+)'/);
+              const targetColor = colorMatch ? colorMatch[1] : null;
+
               for (const chap of chapters) {
                   const asgs = assignmentsByChapter[chap.id] || [];
                   for (const asg of asgs) {
                       if (asg.isVirtual) continue;
                       
-                      const qSnap = await getDocs(collection(db, "users", uid, "chapters", chap.id, "assignments", asg.id, "questions"));
+                      let qRef = collection(db, "users", uid, "chapters", chap.id, "assignments", asg.id, "questions");
+                      
+                      // Optimization: Use Firestore filter for colors if specific color (not 'none') is requested
+                      if (targetColor && targetColor !== 'none') {
+                          qRef = query(qRef, where("color", "==", targetColor));
+                      }
+
+                      const qSnap = await getDocs(qRef);
                       qSnap.docs.forEach(dSnap => {
                           const data = dSnap.data();
                           const questionTagNames = (data.tags || []).map(tid => tags.find(t => t.id === tid)?.name).filter(Boolean);
@@ -212,8 +222,8 @@ const CommandCenter = ({
                               const targetTag = clause.split("tag='")[1].split("'")[0];
                               matches = matches && questionTagNames.includes(targetTag);
                           }
+                          // Note: If we already filtered by color in Firestore, this check is redundant but safe
                           if (clause.includes("color='")) {
-                              const targetColor = clause.split("color='")[1].split("'")[0];
                               matches = matches && (data.color || 'none') === targetColor;
                           }
                           

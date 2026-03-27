@@ -5,6 +5,8 @@ import {
   addDoc,
   doc,
   updateDoc,
+  query,
+  where,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { parseNumberList, evaluateTagQuery } from "../utils";
@@ -253,18 +255,24 @@ export default function VirtualAssignmentModal({
       for (const target of targets) {
         if (!target.chapterId || !target.assignmentId) continue;
 
-        const qSnap = await getDocs(
-          collection(
-            db,
-            "users",
-            auth.currentUser.uid,
-            "chapters",
-            target.chapterId,
-            "assignments",
-            target.assignmentId,
-            "questions",
-          ),
+        let qRef = collection(
+          db,
+          "users",
+          auth.currentUser.uid,
+          "chapters",
+          target.chapterId,
+          "assignments",
+          target.assignmentId,
+          "questions",
         );
+
+        // Optimization: Use Firestore filter for colors if "none" is NOT selected.
+        // If "none" is selected, we fetch all to ensure we don't miss documents where the color field is missing.
+        if (target.colors.length > 0 && !target.colors.includes("none")) {
+          qRef = query(qRef, where("color", "in", target.colors));
+        }
+
+        const qSnap = await getDocs(qRef);
 
         const targetNums = parseNumberList(target.numbers);
 
