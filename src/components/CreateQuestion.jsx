@@ -11,14 +11,20 @@ export default function CreateQuestion({
   setMode,
 }) {
   const [isBulkMode, setIsBulkMode] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
-    if (isBulkMode && newFiles && newFiles.length > 0) {
-      handleCreateQuestion(e, newFiles, true);
-    } else {
-      handleCreateQuestion(e, null, false);
+    try {
+      if (isBulkMode && newFiles && newFiles.length > 0) {
+        await handleCreateQuestion(e, newFiles, true);
+      } else {
+        await handleCreateQuestion(e, null, false);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -33,6 +39,7 @@ export default function CreateQuestion({
             type="checkbox"
             checked={isBulkMode}
             onChange={(e) => setIsBulkMode(e.target.checked)}
+            disabled={loading}
           />
           <span className="slider"></span>
         </label>
@@ -46,13 +53,18 @@ export default function CreateQuestion({
               value={newNoteText}
               onChange={setNewNoteText}
               placeholder="Enter question details (Markdown & Math supported)..."
+              disabled={loading}
             />
           </>
         )}
 
         <div style={{ marginTop: isBulkMode ? 0 : 15, marginBottom: 15 }}>
           {/* Files are sorted/reordered inside this component */}
-          <ImageInput files={newFiles} setFiles={setNewFiles} />
+          <ImageInput
+            files={newFiles}
+            setFiles={setNewFiles}
+            disabled={loading}
+          />
 
           {isBulkMode && newFiles?.length > 0 && (
             <p
@@ -69,13 +81,18 @@ export default function CreateQuestion({
         </div>
 
         <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <button className="btn-primary" type="submit">
-            {isBulkMode ? "Create All Questions" : "Add Question"}
+          <button className="btn-primary" type="submit" disabled={loading}>
+            {loading
+              ? "Creating..."
+              : isBulkMode
+              ? "Create All Questions"
+              : "Add Question"}
           </button>
           <button
             type="button"
             className="btn-outline-secondary"
             onClick={() => setMode("view")}
+            disabled={loading}
           >
             Cancel
           </button>

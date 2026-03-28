@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { FileUploader } from "react-drag-drop-files";
 
-export default function ImageInput({ files, setFiles }) {
+export default function ImageInput({ files, setFiles, disabled = false }) {
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
 
@@ -17,6 +17,7 @@ export default function ImageInput({ files, setFiles }) {
 
   // --- 1. Handle "Ctrl+V" (Desktop) ---
   useEffect(() => {
+    if (disabled) return;
     const handlePaste = (e) => {
       // Only run this if we have clipboard data in the event (Desktop)
       if (e.clipboardData && e.clipboardData.items) {
@@ -38,10 +39,11 @@ export default function ImageInput({ files, setFiles }) {
     };
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [setFiles]);
+  }, [setFiles, disabled]);
 
   // --- 2. Handle "Paste Button" Click (Tablet/Mobile) ---
   const handleManualPaste = async () => {
+    if (disabled) return;
     try {
       // Check if the browser supports reading from clipboard
       if (!navigator.clipboard || !navigator.clipboard.read) {
@@ -81,14 +83,17 @@ export default function ImageInput({ files, setFiles }) {
 
   // --- 3. Drag & Drop Handlers ---
   const handleUploadChange = (newlyAdded) => {
+    if (disabled) return;
     setFiles((prev) => sortFilesByName([...prev, ...newlyAdded]));
   };
 
   const handleRemove = (indexToRemove) => {
+    if (disabled) return;
     setFiles(files.filter((_, index) => index !== indexToRemove));
   };
 
   const handleSort = () => {
+    if (disabled) return;
     let _files = [...files];
     const draggedItemContent = _files.splice(dragItem.current, 1)[0];
     _files.splice(dragOverItem.current, 0, draggedItemContent);
@@ -98,7 +103,13 @@ export default function ImageInput({ files, setFiles }) {
   };
 
   return (
-    <div className="image-input-wrapper">
+    <div
+      className="image-input-wrapper"
+      style={{
+        opacity: disabled ? 0.7 : 1,
+        pointerEvents: disabled ? "none" : "auto",
+      }}
+    >
       <div
         style={{
           display: "flex",
@@ -129,6 +140,7 @@ export default function ImageInput({ files, setFiles }) {
           onClick={handleManualPaste}
           className="btn-outline-primary btn-sm"
           style={{ padding: "4px 10px", fontSize: "0.8rem" }}
+          disabled={disabled}
         >
           Paste Image
         </button>
@@ -141,6 +153,7 @@ export default function ImageInput({ files, setFiles }) {
         types={["JPG", "PNG", "GIF", "JPEG"]}
         maxSize={10}
         multiple
+        disabled={disabled}
       />
 
       {files?.length > 0 && (
@@ -170,13 +183,18 @@ export default function ImageInput({ files, setFiles }) {
             {files.map((file, index) => (
               <div
                 key={index}
-                draggable
+                draggable={!disabled}
                 onDragStart={(e) => {
+                  if (disabled) return;
                   dragItem.current = index;
                   e.target.style.opacity = "0.5";
                 }}
-                onDragEnter={(e) => (dragOverItem.current = index)}
+                onDragEnter={(e) => {
+                  if (disabled) return;
+                  dragOverItem.current = index;
+                }}
                 onDragEnd={(e) => {
+                  if (disabled) return;
                   e.target.style.opacity = "1";
                   handleSort();
                 }}
@@ -189,7 +207,7 @@ export default function ImageInput({ files, setFiles }) {
                   padding: "8px 10px",
                   background: "rgba(255,255,255,0.05)",
                   borderRadius: 4,
-                  cursor: "grab",
+                  cursor: disabled ? "default" : "grab",
                 }}
               >
                 <div
@@ -215,13 +233,15 @@ export default function ImageInput({ files, setFiles }) {
                 <button
                   type="button"
                   onClick={() => handleRemove(index)}
+                  disabled={disabled}
                   style={{
                     background: "none",
                     border: "none",
                     color: "var(--danger)",
-                    cursor: "pointer",
+                    cursor: disabled ? "default" : "pointer",
                     fontSize: "1.2rem",
                     padding: "0 5px",
+                    opacity: disabled ? 0.5 : 1,
                   }}
                 >
                   &times;
