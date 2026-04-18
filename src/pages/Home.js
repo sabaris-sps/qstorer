@@ -33,6 +33,7 @@ import VirtualAssignmentModal from "../components/VirtualAssignmentModal";
 import ImportChapterModal from "../components/ImportChapterModal";
 import CommandCenter from "../components/CommandCenter";
 import { exportQuestionsToPDF } from "../utils";
+import { reverse } from "firebase/firestore/pipelines";
 
 /* Toast component */
 function Toast({ toast }) {
@@ -104,6 +105,7 @@ export default function Home() {
     numberText: "",
     colors: [],
     tagQuery: "",
+    reverseOrder: false
   });
 
   // Virtual View Modal
@@ -1523,7 +1525,8 @@ export default function Home() {
     if (
       !filterConfig.numberText &&
       filterConfig.colors.length === 0 &&
-      !filterConfig.tagQuery
+      !filterConfig.tagQuery &&
+      !filterConfig.reverseOrder
     ) {
       return questions;
     }
@@ -1532,7 +1535,7 @@ export default function Home() {
     const hasNumberFilter = targetNumbers.length > 0;
     const hasColorFilter = filterConfig.colors.length > 0;
 
-    return questions.filter((q) => {
+    const filtered =  questions.filter((q) => {
       const numberMatches = hasNumberFilter
         ? targetNumbers.includes(q.number)
         : true;
@@ -1551,6 +1554,11 @@ export default function Home() {
 
       return numberMatches && colorMatches && tagMatches;
     });
+
+    if (filterConfig.reverseOrder) 
+      return filtered.reverse()
+    return filtered
+
   }, [questions, filterConfig, tags]);
 
   useEffect(() => {

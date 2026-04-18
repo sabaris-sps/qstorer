@@ -11,6 +11,13 @@ export default function FilterModal({
   const [textInput, setTextInput] = useState("");
   const [selectedColors, setSelectedColors] = useState([]);
   const [tagQuery, setTagQuery] = useState("");
+
+
+  const [reverseQuestions, setReverseQuestions] = useState(() => {
+    const saved = localStorage.getItem("reverseQuestions");
+    return saved !== "false";
+  });
+
   useEffect(() => {
     if (isOpen) {
       setTextInput(currentFilter.numberText || "");
@@ -18,6 +25,11 @@ export default function FilterModal({
       setTagQuery(currentFilter.tagQuery || "");
     }
   }, [isOpen, currentFilter]);
+
+
+  useEffect(() => {
+    localStorage.setItem("reverseQuestions", reverseQuestions);
+  }, [reverseQuestions]);
 
   if (!isOpen) return null;
 
@@ -30,12 +42,13 @@ export default function FilterModal({
   };
 
   const handleApply = () => {
-    onApply({ numberText: textInput, colors: selectedColors, tagQuery });
+    onApply({ numberText: textInput, colors: selectedColors, tagQuery, reverseOrder: reverseQuestions });
     onClose();
   };
 
   const handleClear = () => {
     onApply({ numberText: "", colors: [], tagQuery: "" });
+    setReverseQuestions(false)
     onClose();
   };
 
@@ -132,6 +145,35 @@ export default function FilterModal({
               />
             ))}
           </div>
+        </div>
+
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+        >
+          <label
+            htmlFor="reverse-questions"
+            style={{
+              fontSize: "0.85rem",
+              cursor: "pointer",
+              color: "var(--text-primary)",
+            }}
+          >
+            Reverse Questions
+          </label>
+          <label className="switch" style={{ margin: 0 }}>
+            <input
+              id="reverse-questions"
+              type="checkbox"
+              checked={reverseQuestions}
+              onChange={(e) => setReverseQuestions(e.target.checked)}
+            />
+            <span className="slider"></span>
+          </label>
         </div>
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
