@@ -1122,7 +1122,38 @@ body.invert-all-images .PhotoView-Photo {
   display: inline !important;
 }
 
-@media (max-width: 768px) {  body, .app-root {
+.mobile-question-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-question-nav {
+    display: flex;
+    gap: 8px;
+    margin-left: 10px;
+    align-items: center;
+  }
+
+  .nav-arrow {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--primary);
+    padding: 6px !important;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .nav-arrow:disabled {
+    color: var(--text-secondary);
+    border-color: var(--border-color);
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  body, .app-root {
     overflow-x: hidden;
     width: 100vw;
   }

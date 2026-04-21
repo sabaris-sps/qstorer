@@ -168,6 +168,7 @@ export default function SelectionBar({
           </button>
           {isChooseMenuOpen && (
             <div className="mobile-choose-dropdown">
+              {/* ... existing mobile-choose-dropdown content ... */}
               <div className="mobile-choose-item">
                 <label>Chapter</label>
                 <select
@@ -252,6 +253,40 @@ export default function SelectionBar({
             </div>
           )}
         </div>
+
+        {/* Question Navigation Arrows (Mobile) */}
+        {activeQuestionId && questions.length > 1 && (
+          <div className="mobile-question-nav">
+            <button
+              className="nav-arrow"
+              onClick={() => {
+                const currentIndex = questions.findIndex(q => q.id === activeQuestionId);
+                if (currentIndex > 0) {
+                  handleSelectQuestion(questions[currentIndex - 1].id);
+                }
+              }}
+              disabled={questions.findIndex(q => q.id === activeQuestionId) === 0}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+            <button
+              className="nav-arrow"
+              onClick={() => {
+                const currentIndex = questions.findIndex(q => q.id === activeQuestionId);
+                if (currentIndex < questions.length - 1) {
+                  handleSelectQuestion(questions[currentIndex + 1].id);
+                }
+              }}
+              disabled={questions.findIndex(q => q.id === activeQuestionId) === questions.length - 1}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* Desktop Selection Items */}
         <div className="desktop-selection-items">
