@@ -10,9 +10,10 @@ export default function Sidebar({
   canFilter,
   isFilterActive,
   isVirtual,
+  isOpen,
 }) {
   return (
-    <aside className="left-panel">
+    <aside className={`left-panel ${isOpen ? "open" : ""}`}>
       {/* Updated Header with Flexbox */}
       <div
         className="qp-header"

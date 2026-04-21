@@ -33,6 +33,19 @@ export default function App() {
     return saved !== "false"; // Default to true
   });
 
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const mobileNavRef = React.useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (mobileNavRef.current && !mobileNavRef.current.contains(event.target)) {
+        setIsMobileNavOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -170,91 +183,174 @@ export default function App() {
               </>
             ) : (
               <>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    marginRight: "12px",
-                  }}
-                >
+                {/* Desktop Navigation */}
+                <div className="desktop-nav" style={{ display: "flex", alignItems: "center" }}>
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "6px",
+                      gap: "12px",
+                      marginRight: "12px",
                     }}
                   >
-                    <label
-                      htmlFor="tags-toggle"
+                    <div
                       style={{
-                        fontSize: "0.85rem",
-                        cursor: "pointer",
-                        color: "var(--text-primary)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
                       }}
                     >
-                      Show Tags
-                    </label>
-                    <label className="switch" style={{ margin: 0 }}>
-                      <input
-                        id="tags-toggle"
-                        type="checkbox"
-                        checked={showTags}
-                        onChange={(e) => setShowTags(e.target.checked)}
-                      />
-                      <span className="slider"></span>
-                    </label>
+                      <label
+                        htmlFor="tags-toggle"
+                        style={{
+                          fontSize: "0.85rem",
+                          cursor: "pointer",
+                          color: "var(--text-primary)",
+                        }}
+                      >
+                        Show Tags
+                      </label>
+                      <label className="switch" style={{ margin: 0 }}>
+                        <input
+                          id="tags-toggle"
+                          type="checkbox"
+                          checked={showTags}
+                          onChange={(e) => setShowTags(e.target.checked)}
+                        />
+                        <span className="slider"></span>
+                      </label>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <label
+                        htmlFor="invert-toggle"
+                        style={{
+                          fontSize: "0.85rem",
+                          cursor: "pointer",
+                          color: "var(--text-primary)",
+                        }}
+                      >
+                        Invert Images
+                      </label>
+                      <label className="switch" style={{ margin: 0 }}>
+                        <input
+                          id="invert-toggle"
+                          type="checkbox"
+                          checked={invertImages}
+                          onChange={(e) => setInvertImages(e.target.checked)}
+                        />
+                        <span className="slider"></span>
+                      </label>
+                    </div>
                   </div>
 
-                  <div
+                  <Link to="/tags" className="toplink">
+                    Manage Tags
+                  </Link>
+                  <Link to="/create-chapter" className="toplink">
+                    Create Chapter
+                  </Link>
+                  <Link to="/create-assignment" className="toplink">
+                    Create Assignment
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="toplink"
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
                     }}
                   >
-                    <label
-                      htmlFor="invert-toggle"
-                      style={{
-                        fontSize: "0.85rem",
-                        cursor: "pointer",
-                        color: "var(--text-primary)",
-                      }}
-                    >
-                      Invert Images
-                    </label>
-                    <label className="switch" style={{ margin: 0 }}>
-                      <input
-                        id="invert-toggle"
-                        type="checkbox"
-                        checked={invertImages}
-                        onChange={(e) => setInvertImages(e.target.checked)}
-                      />
-                      <span className="slider"></span>
-                    </label>
-                  </div>
+                    Logout
+                  </button>
                 </div>
 
-                <Link to="/tags" className="toplink">
-                  Manage Tags
-                </Link>
-                <Link to="/create-chapter" className="toplink">
-                  Create Chapter
-                </Link>
-                <Link to="/create-assignment" className="toplink">
-                  Create Assignment
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="toplink"
-                  style={{
-                    border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                  }}
-                >
-                  Logout
-                </button>
+                {/* Mobile Navigation Dropdown */}
+                <div className="mobile-nav-container" ref={mobileNavRef}>
+                  <button
+                    className="toplink nav-toggle-btn"
+                    onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+                    style={{
+                      border: "1px solid var(--border-color)",
+                      background: "var(--bg-light)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Navigate ▾
+                  </button>
+                  {isMobileNavOpen && (
+                    <div className="mobile-dropdown">
+                      <div className="mobile-dropdown-item toggle-item">
+                        <span>Show Tags</span>
+                        <label className="switch" style={{ margin: 0 }}>
+                          <input
+                            type="checkbox"
+                            checked={showTags}
+                            onChange={(e) => setShowTags(e.target.checked)}
+                          />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+                      <div className="mobile-dropdown-item toggle-item">
+                        <span>Invert Images</span>
+                        <label className="switch" style={{ margin: 0 }}>
+                          <input
+                            type="checkbox"
+                            checked={invertImages}
+                            onChange={(e) => setInvertImages(e.target.checked)}
+                          />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+                      <div className="dropdown-divider"></div>
+                      <Link
+                        to="/tags"
+                        className="mobile-dropdown-item"
+                        onClick={() => setIsMobileNavOpen(false)}
+                      >
+                        Manage Tags
+                      </Link>
+                      <Link
+                        to="/create-chapter"
+                        className="mobile-dropdown-item"
+                        onClick={() => setIsMobileNavOpen(false)}
+                      >
+                        Create Chapter
+                      </Link>
+                      <Link
+                        to="/create-assignment"
+                        className="mobile-dropdown-item"
+                        onClick={() => setIsMobileNavOpen(false)}
+                      >
+                        Create Assignment
+                      </Link>
+                      <div className="dropdown-divider"></div>
+                      <button
+                        onClick={() => {
+                          handleLogout();
+                          setIsMobileNavOpen(false);
+                        }}
+                        className="mobile-dropdown-item danger"
+                        style={{
+                          border: "none",
+                          background: "transparent",
+                          cursor: "pointer",
+                          width: "100%",
+                          textAlign: "left",
+                        }}
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </nav>

@@ -92,6 +92,7 @@ export default function Home() {
   const [moveTab, setMoveTab] = useState("move"); // "move" or "bulk"
   const [bulkNumbersInput, setBulkNumbersInput] = useState(""); // e.g. "4,5,7"
   const [bulkByNumbersLoading, setBulkByNumbersLoading] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Edit chapter, assignment name
   const [showEditNamesPopup, setShowEditNamesPopup] = useState(false);
@@ -1899,7 +1900,10 @@ export default function Home() {
         questions={visibleQuestions}
         activeQuestionId={activeQuestionId}
         setActiveQuestionId={setActiveQuestionId}
-        handleSelectQuestion={handleSelectQuestion}
+        handleSelectQuestion={(qid) => {
+          handleSelectQuestion(qid);
+          setIsSidebarOpen(false); // Close sidebar on selection (mobile)
+        }}
         selectedChapter={selectedChapter}
         selectedAssignment={selectedAssignment}
         setMode={setMode}
@@ -1909,7 +1913,16 @@ export default function Home() {
           filterConfig.numberText || filterConfig.colors.length > 0
         }
         isVirtual={isCurrentlyVirtual}
+        isOpen={isSidebarOpen}
       />
+
+      {/* Sidebar backdrop for mobile */}
+      {isSidebarOpen && (
+        <div 
+          className="sidebar-backdrop"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
 
       {/* main panel */}
       <section className="main-panel">
@@ -1944,6 +1957,8 @@ export default function Home() {
           onImportJSON={handleImportJSON}
           onExportChapter={handleExportChapter}
           onImportChapterClick={() => setShowImportChapterModal(true)}
+          setIsSidebarOpen={setIsSidebarOpen}
+          isSidebarOpen={isSidebarOpen}
         />
 
         {!selectedChapter || !selectedAssignment ? (

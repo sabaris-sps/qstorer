@@ -27,6 +27,8 @@ export default function SelectionBar({
   onImportJSON,
   onExportChapter,
   onImportChapterClick,
+  setIsSidebarOpen,
+  isSidebarOpen,
 }) {
   const [showExportModal, setShowExportModal] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false); // Dropdown state
@@ -117,6 +119,37 @@ export default function SelectionBar({
       />
 
       <div className="selection-bar">
+        {/* Hamburger Menu for Mobile Sidebar */}
+        <button
+          className="hamburger-menu-btn"
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          aria-label="Toggle Sidebar"
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--text-primary)",
+            cursor: "pointer",
+            padding: "8px",
+            display: "none", // Hidden by default, shown via CSS on mobile
+            marginRight: "10px",
+          }}
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+
         <div className="sel-item">
           <label>Chap</label>
           <select
