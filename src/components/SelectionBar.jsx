@@ -32,14 +32,22 @@ export default function SelectionBar({
 }) {
   const [showExportModal, setShowExportModal] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false); // Dropdown state
+  const [isChooseMenuOpen, setIsChooseMenuOpen] = useState(false); // Mobile 'Choose' dropdown
   const fileInputRef = useRef(null);
   const menuRef = useRef(null); // Ref for click-outside detection
+  const chooseMenuRef = useRef(null); // Ref for mobile 'Choose' dropdown
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setIsMenuOpen(false);
+      }
+      if (
+        chooseMenuRef.current &&
+        !chooseMenuRef.current.contains(event.target)
+      ) {
+        setIsChooseMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -150,81 +158,181 @@ export default function SelectionBar({
           </svg>
         </button>
 
-        <div className="sel-item">
-          <label>Chap</label>
-          <select
-            value={selectedChapter || ""}
-            onChange={(e) => setSelectedChapter(e.target.value)}
-          >
-            <option value="">Select Chapter</option>
-            {chapters
-              .sort((a, b) =>
-                a.name.localeCompare(b.name, undefined, {
-                  numeric: true,
-                  sensitivity: "base",
-                }),
-              )
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-          </select>
-        </div>
-
-        <div className="sel-item">
-          <label>Asgn</label>
-          <select
-            value={selectedAssignment || ""}
-            onChange={(e) => setSelectedAssignment(e.target.value)}
-          >
-            <option value="">Select Assignment</option>
-            {assignments
-              .sort((a, b) =>
-                a.name.localeCompare(b.name, undefined, {
-                  numeric: true,
-                  sensitivity: "base",
-                }),
-              )
-              .map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-          </select>
-        </div>
-
-        <div className="sel-actions">
-          {/* Primary Quick Actions */}
-          {!isVirtual && (
-            <button
-              className="btn-outline-primary btn-sm"
-              onClick={onCreateVirtual}
-              title="Create a filtered cross-assignment view"
-            >
-              New View
-            </button>
-          )}
-          {isVirtual && (
-            <button
-              className="btn-outline-primary btn-sm"
-              onClick={onEditVirtual}
-              style={{ marginLeft: 8 }}
-            >
-              Update View
-            </button>
-          )}
+        {/* Mobile 'Choose' Dropdown */}
+        <div className="mobile-choose-container" ref={chooseMenuRef}>
           <button
-            className="btn-outline-secondary btn-sm"
-            onClick={() => {
-              if (user) loadChaptersForUser();
-              handleSelectQuestion(activeQuestionId);
-            }}
+            className="btn-outline-primary btn-sm mobile-choose-btn"
+            onClick={() => setIsChooseMenuOpen(!isChooseMenuOpen)}
           >
-            Reload
+            Choose ▾
           </button>
+          {isChooseMenuOpen && (
+            <div className="mobile-choose-dropdown">
+              <div className="mobile-choose-item">
+                <label>Chapter</label>
+                <select
+                  value={selectedChapter || ""}
+                  onChange={(e) => {
+                    setSelectedChapter(e.target.value);
+                  }}
+                >
+                  <option value="">Select Chapter</option>
+                  {chapters
+                    .sort((a, b) =>
+                      a.name.localeCompare(b.name, undefined, {
+                        numeric: true,
+                        sensitivity: "base",
+                      }),
+                    )
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div className="mobile-choose-item">
+                <label>Assignment</label>
+                <select
+                  value={selectedAssignment || ""}
+                  onChange={(e) => {
+                    setSelectedAssignment(e.target.value);
+                  }}
+                >
+                  <option value="">Select Assignment</option>
+                  {assignments
+                    .sort((a, b) =>
+                      a.name.localeCompare(b.name, undefined, {
+                        numeric: true,
+                        sensitivity: "base",
+                      }),
+                    )
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div className="dropdown-divider"></div>
+              <div className="mobile-choose-actions">
+                {!isVirtual && (
+                  <button
+                    className="btn-outline-primary btn-sm"
+                    onClick={() => {
+                      onCreateVirtual();
+                      setIsChooseMenuOpen(false);
+                    }}
+                  >
+                    New View
+                  </button>
+                )}
+                {isVirtual && (
+                  <button
+                    className="btn-outline-primary btn-sm"
+                    onClick={() => {
+                      onEditVirtual();
+                      setIsChooseMenuOpen(false);
+                    }}
+                  >
+                    Update View
+                  </button>
+                )}
+                <button
+                  className="btn-outline-secondary btn-sm"
+                  onClick={() => {
+                    if (user) loadChaptersForUser();
+                    handleSelectQuestion(activeQuestionId);
+                    setIsChooseMenuOpen(false);
+                  }}
+                >
+                  Reload
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
-          {/* More Options Dropdown */}
+        {/* Desktop Selection Items */}
+        <div className="desktop-selection-items">
+          <div className="sel-item">
+            <label>Chap</label>
+            <select
+              value={selectedChapter || ""}
+              onChange={(e) => setSelectedChapter(e.target.value)}
+            >
+              <option value="">Select Chapter</option>
+              {chapters
+                .sort((a, b) =>
+                  a.name.localeCompare(b.name, undefined, {
+                    numeric: true,
+                    sensitivity: "base",
+                  }),
+                )
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div className="sel-item">
+            <label>Asgn</label>
+            <select
+              value={selectedAssignment || ""}
+              onChange={(e) => setSelectedAssignment(e.target.value)}
+            >
+              <option value="">Select Assignment</option>
+              {assignments
+                .sort((a, b) =>
+                  a.name.localeCompare(b.name, undefined, {
+                    numeric: true,
+                    sensitivity: "base",
+                  }),
+                )
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div className="sel-actions">
+            {/* Primary Quick Actions */}
+            {!isVirtual && (
+              <button
+                className="btn-outline-primary btn-sm"
+                onClick={onCreateVirtual}
+                title="Create a filtered cross-assignment view"
+              >
+                New View
+              </button>
+            )}
+            {isVirtual && (
+              <button
+                className="btn-outline-primary btn-sm"
+                onClick={onEditVirtual}
+                style={{ marginLeft: 8 }}
+              >
+                Update View
+              </button>
+            )}
+            <button
+              className="btn-outline-secondary btn-sm"
+              onClick={() => {
+                if (user) loadChaptersForUser();
+                handleSelectQuestion(activeQuestionId);
+              }}
+            >
+              Reload
+            </button>
+          </div>
+        </div>
+
+        {/* More Options Dropdown (Always visible on selection bar) */}
+        <div className="sel-actions-more">
           <div className="dropdown-container" ref={menuRef}>
             <button
               className="btn-outline-secondary btn-sm"
@@ -248,6 +356,7 @@ export default function SelectionBar({
                 <circle cx="12" cy="19" r="1.5"></circle>
               </svg>
             </button>
+            {/* ... dropdown-menu content same as before ... */}
 
             {isMenuOpen && (
               <div className="dropdown-menu">

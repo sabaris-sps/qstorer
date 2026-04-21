@@ -115,6 +115,10 @@ h6 {
   color: var(--text-primary);
 }
 
+.image-input-wrapper label {
+  max-width: 100%;
+}
+
 /* Main content layout */
 .content {
   flex: 1;
@@ -130,6 +134,13 @@ h6 {
   /* Rows: Only one main row now */
   grid-template-rows: 1fr;
   height: calc(100vh - 50px);
+}
+
+.desktop-selection-items {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex: 1;
 }
 
 /* Selection Bar (Top Row) */
@@ -1042,16 +1053,91 @@ body.invert-all-images .PhotoView-Photo {
   background-color: transparent;
 }
 
-@media (max-width: 768px) {
+/* ===================================== */
+/* Mobile 'Choose' Dropdown              */
+/* ===================================== */
+.mobile-choose-container {
+  position: relative;
+  display: none;
+}
+
+.mobile-choose-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: var(--bg-light);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  z-index: 2100;
+  min-width: 250px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.mobile-choose-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.mobile-choose-item label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: bold;
+}
+
+.mobile-choose-item select {
+  width: 100%;
+  padding: 8px;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+}
+
+.mobile-choose-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.mobile-choose-actions button {
+  flex: 1;
+}
+
+.drag-drop-zone {
+  display: none;
+}
+
+.attachment-hint {
+  display: none !important;
+}
+
+.attachment-hint-mobile {
+  display: inline !important;
+}
+
+@media (max-width: 768px) {  body, .app-root {
+    overflow-x: hidden;
+    width: 100vw;
+  }
+
   * {
     font-size: small;
   }
 
-  .desktop-nav {
+  .desktop-nav,
+  .desktop-selection-items {
     display: none !important;
   }
 
-  .mobile-nav-container {
+  .mobile-nav-container,
+  .mobile-choose-container {
     display: block;
   }
 
@@ -1064,7 +1150,8 @@ body.invert-all-images .PhotoView-Photo {
   .left-panel {
     position: fixed;
     top: 50px;
-    left: -260px; /* Hidden state */
+    left: -260px;
+    /* Hidden state */
     width: 250px;
     height: calc(100vh - 50px);
     z-index: 1500;
@@ -1073,7 +1160,8 @@ body.invert-all-images .PhotoView-Photo {
   }
 
   .left-panel.open {
-    left: 0; /* Visible state */
+    left: 0;
+    /* Visible state */
   }
 
   /* Sidebar Backdrop */
@@ -1090,7 +1178,8 @@ body.invert-all-images .PhotoView-Photo {
 
   .home-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr; /* Single row for main panel */
+    grid-template-rows: 1fr;
+    /* Single row for main panel */
   }
 
   .main-panel {
@@ -1106,8 +1195,9 @@ body.invert-all-images .PhotoView-Photo {
 
   .selection-bar {
     align-items: center;
-    gap: 10px;
+    gap: 0;
     padding: 5px;
+    justify-content: space-between;
   }
 
   .selection-bar select {
@@ -1138,9 +1228,12 @@ body.invert-all-images .PhotoView-Photo {
   }
 
   .sel-actions {
+    display: none;
+    /* Hide desktop actions */
+  }
+
+  .sel-actions-more {
     margin-left: auto;
-    width: auto;
-    justify-content: flex-end;
   }
 
   .note-section {
@@ -1149,6 +1242,13 @@ body.invert-all-images .PhotoView-Photo {
 
   .note-section label {
     display: none;
+  }
+
+  .upload-more {
+    width: 90%;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 10px;
   }
 
   .q-grid {
@@ -1332,7 +1432,8 @@ body.invert-all-images .PhotoView-Photo {
   margin: 10px 0;
 }
 
-.markdown-preview ul, .markdown-preview ol {
+.markdown-preview ul,
+.markdown-preview ol {
   margin-left: 20px;
   margin-bottom: 10px;
 }

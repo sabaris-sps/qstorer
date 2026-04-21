@@ -116,13 +116,16 @@ export default function ImageInput({ files, setFiles, disabled = false }) {
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: 8,
-          minWidth: "322px",
+          width: "100%",
           maxWidth: "508px",
+          flexWrap: "wrap",
+          gap: "8px"
         }}
       >
         <label style={{ fontWeight: "bold", display: "block", margin: 0 }}>
           Attachments
           <span
+            className="attachment-hint"
             style={{
               fontWeight: "normal",
               fontSize: "0.8rem",
@@ -131,6 +134,18 @@ export default function ImageInput({ files, setFiles, disabled = false }) {
             }}
           >
             (Drag, Drop, or Paste)
+          </span>
+          <span
+            className="attachment-hint-mobile"
+            style={{
+              fontWeight: "normal",
+              fontSize: "0.8rem",
+              color: "var(--text-secondary)",
+              marginLeft: 8,
+              display: "none"
+            }}
+          >
+            (Paste)
           </span>
         </label>
 
@@ -146,15 +161,17 @@ export default function ImageInput({ files, setFiles, disabled = false }) {
         </button>
       </div>
 
-      <FileUploader
-        label="Upload, drop or paste a file"
-        handleChange={handleUploadChange}
-        name="file-uploader"
-        types={["JPG", "PNG", "GIF", "JPEG"]}
-        maxSize={10}
-        multiple
-        disabled={disabled}
-      />
+      <div className="drag-drop-zone">
+        <FileUploader
+          label="Upload, drop or paste a file"
+          handleChange={handleUploadChange}
+          name="file-uploader"
+          types={["JPG", "PNG", "GIF", "JPEG"]}
+          maxSize={10}
+          multiple
+          disabled={disabled}
+        />
+      </div>
 
       {files?.length > 0 && (
         <div
