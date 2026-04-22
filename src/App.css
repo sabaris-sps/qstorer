@@ -115,9 +115,6 @@ h6 {
   color: var(--text-primary);
 }
 
-.image-input-wrapper label {
-  max-width: 100%;
-}
 
 /* Main content layout */
 .content {
@@ -1110,10 +1107,6 @@ body.invert-all-images .PhotoView-Photo {
   flex: 1;
 }
 
-.drag-drop-zone {
-  display: none;
-}
-
 .attachment-hint {
   display: none !important;
 }
@@ -1153,7 +1146,8 @@ body.invert-all-images .PhotoView-Photo {
     cursor: not-allowed;
   }
 
-  body, .app-root {
+  body,
+  .app-root {
     overflow-x: hidden;
     width: 100vw;
   }
