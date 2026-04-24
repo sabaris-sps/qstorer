@@ -121,21 +121,27 @@ const safeEmbedImage = async (pdfDoc, imageUrl) => {
       return null;
     }
 
-    const imageBytes = await fetch(imageUrl).then((res) => {
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      return res.arrayBuffer();
-    });
+    const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const contentType = response.headers.get("content-type") || "";
+    const imageBytes = await response.arrayBuffer();
 
     let pdfImage;
-    let imageExtension = imageUrl.split(".").pop().toLowerCase();
-
-    if (imageExtension === "png") {
+    if (contentType.includes("image/png")) {
       pdfImage = await pdfDoc.embedPng(imageBytes);
-    } else if (["jpg", "jpeg"].includes(imageExtension)) {
+    } else if (contentType.includes("image/jpeg") || contentType.includes("image/jpg")) {
       pdfImage = await pdfDoc.embedJpg(imageBytes);
     } else {
-      console.warn(`Skipping unsupported image format: ${imageExtension}`);
-      return null;
+      // Fallback to extension if content-type is missing or generic
+      let imageExtension = imageUrl.split(".").pop().toLowerCase().split(/[?#]/)[0];
+      if (imageExtension === "png") {
+        pdfImage = await pdfDoc.embedPng(imageBytes);
+      } else if (["jpg", "jpeg"].includes(imageExtension)) {
+        pdfImage = await pdfDoc.embedJpg(imageBytes);
+      } else {
+        console.warn(`Skipping unsupported image format: ${contentType || imageExtension}`);
+        return null;
+      }
     }
     return pdfImage;
   } catch (e) {
@@ -190,6 +196,7 @@ export const exportQuestionsToPDF = async (
   const { includeNotes } = options;
 
   const pdfDoc = await PDFDocument.create();
+  // Using Courier for the requested monospace look
   const font = await pdfDoc.embedFont(StandardFonts.Courier);
   const fontBold = await pdfDoc.embedFont(StandardFonts.CourierBold);
 
@@ -214,6 +221,8 @@ export const exportQuestionsToPDF = async (
           noteImage = await safeEmbedImage(pdfDoc, noteDataUrl);
           if (noteImage) {
             const { width, height } = noteImage;
+            // Use natural width if it's smaller than USABLE_WIDTH to avoid pixelation
+            // (Note: renderNoteToImage uses USABLE_WIDTH for container width)
             const scaleFactor = USABLE_WIDTH / width;
             noteDisplayWidth = USABLE_WIDTH;
             noteDisplayHeight = height * scaleFactor;
@@ -221,68 +230,76 @@ export const exportQuestionsToPDF = async (
         }
       }
 
-      // ... Image Processing (remains same) ...
-      const processedImages = [];
-      let totalImagesHeight = 0;
-
+      // Process Images with Smart Scaling and Grid Layout
+      const imageRows = [];
       if (question.images && question.images.length > 0) {
+        let currentRow = [];
+        let currentRowWidth = 0;
+        const GAP = 10;
+
         for (const imageUrl of question.images) {
           if (!imageUrl) continue;
           const pdfImage = await safeEmbedImage(pdfDoc, imageUrl);
           if (!pdfImage) continue;
 
           const { width, height } = pdfImage;
-          const scaleFactor = USABLE_WIDTH / width;
-          let imgDisplayWidth = USABLE_WIDTH;
-          let imgDisplayHeight = height * scaleFactor;
-
-          const MAX_HEIGHT_RATIO = 0.5;
-          const maxHeight = (A4_HEIGHT_PTS - 2 * MARGIN) * MAX_HEIGHT_RATIO;
-
-          if (imgDisplayHeight > maxHeight) {
-            imgDisplayHeight = maxHeight;
-            imgDisplayWidth = width * (maxHeight / height);
+          
+          // Calculate a single scale factor to maintain aspect ratio perfectly
+          let scaleFactor = 1.0;
+          
+          // Constraint 1: Width limit
+          if (width > USABLE_WIDTH) {
+            scaleFactor = USABLE_WIDTH / width;
+          }
+          
+          // Constraint 2: Height limit (max 45% of page)
+          const MAX_HEIGHT = (A4_HEIGHT_PTS - 2 * MARGIN) * 0.45;
+          if (height * scaleFactor > MAX_HEIGHT) {
+            scaleFactor = MAX_HEIGHT / height;
           }
 
-          processedImages.push({
-            imgObj: pdfImage,
-            width: imgDisplayWidth,
-            height: imgDisplayHeight,
-          });
+          const imgDisplayWidth = width * scaleFactor;
+          const imgDisplayHeight = height * scaleFactor;
+          const imgData = { imgObj: pdfImage, width: imgDisplayWidth, height: imgDisplayHeight, originalScale: scaleFactor };
 
-          totalImagesHeight += imgDisplayHeight + SPACING.AFTER_IMAGE;
+          // 4. Grid Logic: Can we fit this in the current row?
+          // Don't grid images that were already heavily scaled down (e.g., < 0.7 original size)
+          // or if they are wider than 50% of usable width
+          const isHeavilyScaled = scaleFactor < 0.7;
+          const canFitInRow = !isHeavilyScaled && 
+                             (currentRowWidth + GAP + imgDisplayWidth) <= USABLE_WIDTH && 
+                             imgDisplayWidth < USABLE_WIDTH * 0.5;
+          
+          if (currentRow.length > 0 && canFitInRow) {
+            currentRow.push(imgData);
+            currentRowWidth += GAP + imgDisplayWidth;
+          } else {
+            if (currentRow.length > 0) imageRows.push({ images: currentRow, width: currentRowWidth, height: Math.max(...currentRow.map(i => i.height)) });
+            currentRow = [imgData];
+            currentRowWidth = imgDisplayWidth;
+          }
+        }
+        if (currentRow.length > 0) {
+          imageRows.push({ images: currentRow, width: currentRowWidth, height: Math.max(...currentRow.map(i => i.height)) });
         }
       }
 
-      // 3. Total Height Calculation
-      const totalBlockHeight =
-        SPACING.HEADER_HEIGHT +
-        noteDisplayHeight +
-        (noteDisplayHeight > 0 ? SPACING.AFTER_TEXT : 0) +
-        totalImagesHeight +
-        SPACING.SEPARATOR;
+      // --- PHASE 2: DRAWING ---
 
-      // --- PHASE 2: PAGE BREAK ---
-      const spaceRemaining = cursorY - MARGIN;
-      const fullPageHeight = A4_HEIGHT_PTS - 2 * MARGIN;
-      let forceNewPage = false;
-
-      if (totalBlockHeight <= spaceRemaining) {
-        forceNewPage = false;
-      } else if (totalBlockHeight <= fullPageHeight) {
-        forceNewPage = true;
-      } else {
-        if (spaceRemaining < fullPageHeight * 0.8) {
-          forceNewPage = true;
-        }
+      // Smart Header Grouping: Ensure header + first content (note or first image row) stay together
+      let firstContentHeight = 0;
+      if (noteImage) {
+        firstContentHeight = noteDisplayHeight + SPACING.AFTER_TEXT;
+      } else if (imageRows.length > 0) {
+        firstContentHeight = imageRows[0].height + SPACING.AFTER_IMAGE;
       }
+      
+      const headerWithContentHeight = 30 + firstContentHeight; // 30 is approx header + padding
 
-      if (forceNewPage) {
+      if (checkPageBreak(cursorY, headerWithContentHeight)) {
         page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
         cursorY = A4_HEIGHT_PTS - MARGIN;
       }
-
-      // --- PHASE 3: DRAWING ---
 
       // Draw Header
       cursorY -= 14;
@@ -291,11 +308,11 @@ export const exportQuestionsToPDF = async (
         y: cursorY,
         size: 14,
         font: fontBold,
-        color: rgb(0.0, 0.0, 0.0),
+        color: rgb(0, 0, 0),
       });
       cursorY -= 10;
 
-      // Draw Note Image (Rendered Markdown/Math)
+      // Draw Note Image
       if (noteImage) {
         if (checkPageBreak(cursorY, noteDisplayHeight + SPACING.AFTER_TEXT)) {
           page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
@@ -312,61 +329,62 @@ export const exportQuestionsToPDF = async (
         cursorY -= SPACING.AFTER_TEXT;
       }
 
-      // Draw Images
-      for (const imgData of processedImages) {
-        const requiredHeight = imgData.height + SPACING.AFTER_IMAGE;
+      // Draw Image Rows
+      for (const row of imageRows) {
+        const requiredHeight = row.height + SPACING.AFTER_IMAGE;
         if (checkPageBreak(cursorY, requiredHeight)) {
           page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
           cursorY = A4_HEIGHT_PTS - MARGIN;
         }
 
-        cursorY -= imgData.height;
-        page.drawImage(imgData.imgObj, {
-          x: MARGIN + (USABLE_WIDTH - imgData.width) / 2,
-          y: cursorY,
-          width: imgData.width,
-          height: imgData.height,
-        });
+        let currentX = MARGIN + (USABLE_WIDTH - row.width) / 2;
+        const rowY = cursorY - row.height;
 
-        // Optional Border
-        page.drawRectangle({
-          x: MARGIN + (USABLE_WIDTH - imgData.width) / 2,
-          y: cursorY,
-          width: imgData.width,
-          height: imgData.height,
-          borderWidth: 1,
-          borderColor: rgb(0, 0, 0),
-          color: rgb(0, 0, 0),
-          opacity: 0,
-          borderOpacity: 1,
-        });
+        for (const imgData of row.images) {
+          // Center vertically within the row if images have different heights
+          const yOffset = (row.height - imgData.height) / 2;
+          
+          page.drawImage(imgData.imgObj, {
+            x: currentX,
+            y: rowY + yOffset,
+            width: imgData.width,
+            height: imgData.height,
+          });
 
-        cursorY -= SPACING.AFTER_IMAGE;
+          // Border
+          page.drawRectangle({
+            x: currentX,
+            y: rowY + yOffset,
+            width: imgData.width,
+            height: imgData.height,
+            borderWidth: 0.5,
+            borderColor: rgb(0.8, 0.8, 0.8),
+            color: rgb(0, 0, 0),
+            opacity: 0,
+            borderOpacity: 1,
+          });
+
+          currentX += imgData.width + 10; // 10 is the GAP
+        }
+        cursorY -= row.height + SPACING.AFTER_IMAGE;
       }
 
       // Separator
-      if (checkPageBreak(cursorY, 30)) {
+      if (checkPageBreak(cursorY, 25)) {
         page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
         cursorY = A4_HEIGHT_PTS - MARGIN;
+      } else {
+        cursorY -= 10;
+        page.drawLine({
+          start: { x: MARGIN, y: cursorY },
+          end: { x: A4_WIDTH_PTS - MARGIN, y: cursorY },
+          thickness: 0.5,
+          color: rgb(0.7, 0.7, 0.7),
+        });
+        cursorY -= 10;
       }
-      cursorY -= 10;
-      page.drawLine({
-        start: { x: MARGIN, y: cursorY },
-        end: { x: A4_WIDTH_PTS - MARGIN, y: cursorY },
-        thickness: 0.5,
-        color: rgb(0.0, 0.0, 0.0),
-      });
-      cursorY -= 5;
-      page.drawLine({
-        start: { x: MARGIN, y: cursorY },
-        end: { x: A4_WIDTH_PTS - MARGIN, y: cursorY },
-        thickness: 0.5,
-        color: rgb(0.0, 0.0, 0.0),
-      });
-      cursorY -= 10;
     } catch (e) {
       console.error(`Skipping Question ${questionNumber} error:`, e);
-      // Error handling...
     }
   }
 
