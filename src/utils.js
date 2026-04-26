@@ -392,19 +392,16 @@ export const exportQuestionsToPDF = async (
   download(pdfBytes, `${name}.pdf`, "application/pdf");
 };
 
-export function evaluateTagQuery(query, questionTagNames) {
+export function evaluateBooleanQuery(query, evaluator) {
   if (!query || !query.trim()) return true;
 
   try {
-    const qTagsLower = questionTagNames.map((t) => t.toLowerCase());
-
     const quoteRegex = /(["'])(.*?)\1/g;
 
     let processedQuery = query.replace(
       quoteRegex,
       (match, quote, innerString) => {
-        const hasTag = qTagsLower.includes(innerString.toLowerCase());
-        return hasTag ? " true " : " false ";
+        return evaluator(innerString) ? " true " : " false ";
       },
     );
 
@@ -424,4 +421,18 @@ export function evaluateTagQuery(query, questionTagNames) {
   } catch (e) {
     return false;
   }
+}
+
+export function evaluateTagQuery(query, questionTagNames) {
+  const qTagsLower = questionTagNames.map((t) => t.toLowerCase());
+  return evaluateBooleanQuery(query, (innerString) =>
+    qTagsLower.includes(innerString.toLowerCase()),
+  );
+}
+
+export function evaluateStringQuery(query, targetString) {
+  const targetLower = (targetString || "").toLowerCase();
+  return evaluateBooleanQuery(query, (innerString) =>
+    targetLower.includes(innerString.toLowerCase()),
+  );
 }

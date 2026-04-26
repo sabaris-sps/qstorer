@@ -27,7 +27,12 @@ import EditNamesModal from "../components/EditNamesModal";
 import CreateQuestion from "../components/CreateQuestion";
 import QuestionCard from "../components/QuestionCard";
 import SelectionBar from "../components/SelectionBar";
-import { sanitizePublicId, parseNumberList, evaluateTagQuery } from "../utils";
+import {
+  sanitizePublicId,
+  parseNumberList,
+  evaluateTagQuery,
+  evaluateStringQuery,
+} from "../utils";
 import FilterModal from "../components/FilterModal";
 import VirtualAssignmentModal from "../components/VirtualAssignmentModal";
 import ImportChapterModal from "../components/ImportChapterModal";
@@ -106,7 +111,9 @@ export default function Home() {
     numberText: "",
     colors: [],
     tagQuery: "",
-    reverseOrder: false
+    assignmentQuery: "",
+    chapterQuery: "",
+    reverseOrder: false,
   });
 
   // Virtual View Modal
@@ -1521,12 +1528,17 @@ export default function Home() {
   // -----------------------------------------------------------
   // FILTER LOGIC
   // -----------------------------------------------------------
+  const currentAsgObj = assignments.find((a) => a.id === selectedAssignment);
+  const isCurrentlyVirtual = currentAsgObj?.isVirtual || false;
+
   const visibleQuestions = useMemo(() => {
     // If no filters are active, return original list
     if (
       !filterConfig.numberText &&
       filterConfig.colors.length === 0 &&
       !filterConfig.tagQuery &&
+      !filterConfig.assignmentQuery &&
+      !filterConfig.chapterQuery &&
       !filterConfig.reverseOrder
     ) {
       return questions;
@@ -1553,14 +1565,41 @@ export default function Home() {
         tagMatches = evaluateTagQuery(filterConfig.tagQuery, questionTagNames);
       }
 
-      return numberMatches && colorMatches && tagMatches;
+      let assignmentMatches = true;
+      if (filterConfig.assignmentQuery) {
+        let asgName = "";
+        if (isCurrentlyVirtual) {
+          const { chapterId, assignmentId } = q.originalPath;
+          const sourceAsgs = assignmentsByChapter?.[chapterId] || [];
+          const sourceAsg = sourceAsgs.find((a) => a.id === assignmentId);
+          if (sourceAsg) asgName = sourceAsg.name;
+        } else {
+          asgName = currentAsgObj?.name || "";
+        }
+        assignmentMatches = evaluateStringQuery(filterConfig.assignmentQuery, asgName);
+      }
+
+      let chapterMatches = true;
+      if (filterConfig.chapterQuery) {
+        let chapName = "";
+        if (isCurrentlyVirtual) {
+          const { chapterId } = q.originalPath;
+          const sourceChap = chapters.find((c) => c.id === chapterId);
+          if (sourceChap) chapName = sourceChap.name;
+        } else {
+          chapName = chapters.find((c) => c.id === selectedChapter)?.name || "";
+        }
+        chapterMatches = evaluateStringQuery(filterConfig.chapterQuery, chapName);
+      }
+
+      return numberMatches && colorMatches && tagMatches && assignmentMatches && chapterMatches;
     });
 
     if (filterConfig.reverseOrder) 
       return filtered.reverse()
     return filtered
 
-  }, [questions, filterConfig, tags]);
+  }, [questions, filterConfig, tags, assignmentsByChapter, assignments, selectedAssignment]);
 
   useEffect(() => {
     function handleKeyDown(e) {
@@ -1618,9 +1657,6 @@ export default function Home() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [photoViewerVisible, activeQuestion, activeQuestionId, visibleQuestions]);
-
-  const currentAsgObj = assignments.find((a) => a.id === selectedAssignment);
-  const isCurrentlyVirtual = currentAsgObj?.isVirtual || false;
 
   // --- Handle JSON Import ---
   const handleImportJSON = async (file) => {
@@ -1910,7 +1946,11 @@ export default function Home() {
         onOpenFilter={() => setShowFilterModal(true)}
         canFilter={!!selectedAssignment}
         isFilterActive={
-          filterConfig.numberText || filterConfig.colors.length > 0
+          filterConfig.numberText ||
+          filterConfig.colors.length > 0 ||
+          filterConfig.tagQuery ||
+          filterConfig.assignmentQuery ||
+          filterConfig.chapterQuery
         }
         isVirtual={isCurrentlyVirtual}
         isOpen={isSidebarOpen}

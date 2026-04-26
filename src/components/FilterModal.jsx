@@ -11,6 +11,8 @@ export default function FilterModal({
   const [textInput, setTextInput] = useState("");
   const [selectedColors, setSelectedColors] = useState([]);
   const [tagQuery, setTagQuery] = useState("");
+  const [assignmentQuery, setAssignmentQuery] = useState("");
+  const [chapterQuery, setChapterQuery] = useState("");
 
 
   const [reverseQuestions, setReverseQuestions] = useState(() => {
@@ -23,6 +25,8 @@ export default function FilterModal({
       setTextInput(currentFilter.numberText || "");
       setSelectedColors(currentFilter.colors || []);
       setTagQuery(currentFilter.tagQuery || "");
+      setAssignmentQuery(currentFilter.assignmentQuery || "");
+      setChapterQuery(currentFilter.chapterQuery || "");
     }
   }, [isOpen, currentFilter]);
 
@@ -42,13 +46,26 @@ export default function FilterModal({
   };
 
   const handleApply = () => {
-    onApply({ numberText: textInput, colors: selectedColors, tagQuery, reverseOrder: reverseQuestions });
+    onApply({
+      numberText: textInput,
+      colors: selectedColors,
+      tagQuery,
+      assignmentQuery,
+      chapterQuery,
+      reverseOrder: reverseQuestions,
+    });
     onClose();
   };
 
   const handleClear = () => {
-    onApply({ numberText: "", colors: [], tagQuery: "" });
-    setReverseQuestions(false)
+    onApply({
+      numberText: "",
+      colors: [],
+      tagQuery: "",
+      assignmentQuery: "",
+      chapterQuery: "",
+    });
+    setReverseQuestions(false);
     onClose();
   };
 
@@ -104,6 +121,64 @@ export default function FilterModal({
             placeholder='e.g. ("tag1" or "tag2") and not "tag3"'
             value={tagQuery}
             onChange={(e) => setTagQuery(e.target.value)}
+            style={{ width: "100%", padding: "8px", fontFamily: "monospace" }}
+          />
+        </div>
+
+        {/* --- ASSIGNMENT QUERY --- */}
+        <div style={{ marginBottom: 16 }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: 4,
+              color: "var(--text-secondary)",
+            }}
+          >
+            By Assignment Name (Boolean Query)
+          </label>
+          <p
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--text-secondary)",
+              marginBottom: "8px",
+              marginTop: 0,
+            }}
+          >
+          </p>
+          <input
+            type="text"
+            placeholder='e.g. "Allen" and not "SFT"'
+            value={assignmentQuery}
+            onChange={(e) => setAssignmentQuery(e.target.value)}
+            style={{ width: "100%", padding: "8px", fontFamily: "monospace" }}
+          />
+        </div>
+
+        {/* --- CHAPTER QUERY --- */}
+        <div style={{ marginBottom: 16 }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: 4,
+              color: "var(--text-secondary)",
+            }}
+          >
+            By Chapter Name (Boolean Query)
+          </label>
+          <p
+            style={{
+              fontSize: "0.75rem",
+              color: "var(--text-secondary)",
+              marginBottom: "8px",
+              marginTop: 0,
+            }}
+          >
+          </p>
+          <input
+            type="text"
+            placeholder='e.g. "Chemistry" and not "Maths"'
+            value={chapterQuery}
+            onChange={(e) => setChapterQuery(e.target.value)}
             style={{ width: "100%", padding: "8px", fontFamily: "monospace" }}
           />
         </div>
