@@ -6,6 +6,7 @@ import CreateAssignment from "./pages/CreateAssignment";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import TagManager from "./pages/TagManager"; // NEW IMPORT
+import ReviewAssignment from "./pages/ReviewAssignment";
 import { auth, db } from "./firebase";
 import { collection, getDocs, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -20,6 +21,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [tags, setTags] = useState([]);
   const [aliases, setAliases] = useState([]);
+  const [reviewQuestions, setReviewQuestions] = useState([]);
 
   const navigate = useNavigate();
 
@@ -162,6 +164,8 @@ export default function App() {
         aliases,
         saveAlias,
         deleteAlias,
+        reviewQuestions,
+        setReviewQuestions,
       }}
     >
       <div className="app-root">
@@ -361,7 +365,8 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/create-chapter" element={<CreateChapter />} />
             <Route path="/create-assignment" element={<CreateAssignment />} />
-            <Route path="/tags" element={<TagManager />} /> {/* NEW ROUTE */}
+            <Route path="/tags" element={<TagManager />} />
+            <Route path="/review" element={<ReviewAssignment />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
           </Routes>

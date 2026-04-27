@@ -134,6 +134,7 @@ export default function Home() {
     aliases,
     saveAlias,
     deleteAlias,
+    setReviewQuestions,
   } = useContext(AppContext);
 
   // ==========================================
@@ -1878,6 +1879,15 @@ export default function Home() {
     }
   };
 
+  const handleReview = () => {
+    if (!visibleQuestions.length) {
+      showToast("No questions to review", "error");
+      return;
+    }
+    setReviewQuestions(visibleQuestions);
+    nav("/review");
+  };
+
   return (
     <div className="home-grid">
       {/* modal for editing chapter, assignment name */}
@@ -1998,6 +2008,7 @@ export default function Home() {
           onExportChapter={handleExportChapter}
           onImportChapterClick={() => setShowImportChapterModal(true)}
           setIsSidebarOpen={setIsSidebarOpen}
+          onReview={handleReview}
           tags={tags}
           isSidebarOpen={isSidebarOpen}
         />

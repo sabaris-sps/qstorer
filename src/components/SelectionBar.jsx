@@ -29,6 +29,7 @@ export default function SelectionBar({
   onImportChapterClick,
   setIsSidebarOpen,
   isSidebarOpen,
+  onReview,
   tags, // NEW: Receive tags as prop
 }) {
   const [showExportModal, setShowExportModal] = useState(false);
@@ -251,6 +252,15 @@ export default function SelectionBar({
                 >
                   Reload
                 </button>
+                <button
+                  className="btn-outline-primary btn-sm"
+                  onClick={() => {
+                    onReview();
+                    setIsChooseMenuOpen(false);
+                  }}
+                >
+                  Review
+                </button>
               </div>
             </div>
           )}
@@ -364,6 +374,13 @@ export default function SelectionBar({
               }}
             >
               Reload
+            </button>
+            <button
+              className="btn-outline-primary btn-sm"
+              onClick={onReview}
+              title="Review questions in full-screen mode"
+            >
+              Review
             </button>
           </div>
         </div>
