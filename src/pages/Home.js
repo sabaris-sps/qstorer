@@ -308,7 +308,7 @@ export default function Home() {
         showToast("JSON Downloaded");
       } else {
         showToast("Generating PDF...");
-        await exportQuestionsToPDF(visibleQuestions, name, { includeNotes: true });
+        await exportQuestionsToPDF(visibleQuestions, name, { includeNotes: true, tags: tags });
         showToast("PDF Downloaded");
       }
     },
@@ -1553,7 +1553,7 @@ export default function Home() {
         ? targetNumbers.includes(q.number)
         : true;
       const colorMatches = hasColorFilter
-        ? filterConfig.colors.includes(q.color)
+        ? filterConfig.colors.includes(q.color || "none")
         : true;
 
       let tagMatches = true;
@@ -1998,6 +1998,7 @@ export default function Home() {
           onExportChapter={handleExportChapter}
           onImportChapterClick={() => setShowImportChapterModal(true)}
           setIsSidebarOpen={setIsSidebarOpen}
+          tags={tags}
           isSidebarOpen={isSidebarOpen}
         />
 

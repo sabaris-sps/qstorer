@@ -8,12 +8,14 @@ export default function ExportModal({
 }) {
   const [fileName, setFileName] = useState("");
   const [includeNotes, setIncludeNotes] = useState(true);
+  const [includeTags, setIncludeTags] = useState(true);
   const [format, setFormat] = useState("pdf"); // NEW: Track format
 
   useEffect(() => {
     if (isOpen) {
       setFileName(defaultName || "assignment-export");
       setIncludeNotes(true);
+      setIncludeTags(true);
       setFormat("pdf"); // Reset to default
     }
   }, [isOpen, defaultName]);
@@ -26,7 +28,7 @@ export default function ExportModal({
       return;
     }
     // Pass both name and options (including format)
-    onExport(fileName, { includeNotes, format });
+    onExport(fileName, { includeNotes, includeTags, format });
     onClose();
   };
 
@@ -102,6 +104,19 @@ export default function ExportModal({
               type="checkbox"
               checked={includeNotes}
               onChange={(e) => setIncludeNotes(e.target.checked)}
+            />
+            <span className="slider"></span>
+          </label>
+        </div>
+
+        {/* Toggle Switch for Tags */}
+        <div className="toggle-container" style={{ marginBottom: 20 }}>
+          <span className="toggle-label">Include Tags?</span>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={includeTags}
+              onChange={(e) => setIncludeTags(e.target.checked)}
             />
             <span className="slider"></span>
           </label>

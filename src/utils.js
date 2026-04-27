@@ -193,12 +193,13 @@ export const exportQuestionsToPDF = async (
     return;
   }
 
-  const { includeNotes } = options;
+  const { includeNotes, includeTags, tags } = options;
 
   const pdfDoc = await PDFDocument.create();
   // Using Courier for the requested monospace look
   const font = await pdfDoc.embedFont(StandardFonts.Courier);
   const fontBold = await pdfDoc.embedFont(StandardFonts.CourierBold);
+  const fontItalic = await pdfDoc.embedFont(StandardFonts.CourierOblique);
 
   let page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
   let cursorY = A4_HEIGHT_PTS - MARGIN;
@@ -301,15 +302,33 @@ export const exportQuestionsToPDF = async (
         cursorY = A4_HEIGHT_PTS - MARGIN;
       }
 
+      // Get tag names for this question
+      const tagNames = (question.tags || [])
+        .map((tagId) => (tags || []).find((t) => t.id === tagId)?.name)
+        .filter(Boolean)
+        .join(", ");
+
       // Draw Header
       cursorY -= 14;
-      page.drawText(`QUESTION ${questionNumber}`, {
+      const headerText = `QUESTION ${questionNumber}`;
+      page.drawText(headerText, {
         x: MARGIN,
         y: cursorY,
         size: 14,
         font: fontBold,
         color: rgb(0, 0, 0),
       });
+
+      if (includeTags && tagNames) { // Only draw if includeTags is true and tags exist
+        const headerWidth = fontBold.widthOfTextAtSize(headerText, 14);
+        page.drawText(` [${tagNames}]`, {
+          x: MARGIN + headerWidth,
+          y: cursorY,
+          size: 9, // Smaller font for tags
+          font: fontItalic, // Use italic font
+          color: rgb(0.3, 0.3, 0.3),
+        });
+      }
       cursorY -= 10;
 
       // Draw Note Image

@@ -29,6 +29,7 @@ export default function SelectionBar({
   onImportChapterClick,
   setIsSidebarOpen,
   isSidebarOpen,
+  tags, // NEW: Receive tags as prop
 }) {
   const [showExportModal, setShowExportModal] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false); // Dropdown state
@@ -77,6 +78,7 @@ export default function SelectionBar({
           note: options.includeNotes ? q.note || "" : "",
           images: q.images || [],
           color: q.color || null,
+          tags: q.tags || [], // Include tags in JSON export as well
         }));
 
         const blob = new Blob([JSON.stringify(dataToExport, null, 2)], {
@@ -92,7 +94,7 @@ export default function SelectionBar({
         showToast("JSON Downloaded");
       } else {
         showToast("Generating PDF... please wait.");
-        await exportQuestionsToPDF(questions, fileName, options);
+        await exportQuestionsToPDF(questions, fileName, { ...options, tags });
         showToast("PDF Downloaded");
       }
     } catch (error) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const COLORS = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#b185db"];
+const COLORS = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2", "#b185db", "none"];
 
 export default function FilterModal({
   isOpen,
@@ -202,22 +202,27 @@ export default function FilterModal({
                 style={{
                   width: 30,
                   height: 30,
-                  backgroundColor: c,
+                  backgroundColor: c === "none" ? "transparent" : c,
                   borderRadius: 4,
                   cursor: "pointer",
                   border: selectedColors.includes(c)
                     ? "2px solid white"
-                    : "2px solid transparent",
+                    : c === "none" ? "1px solid #555" : "2px solid transparent",
                   opacity: selectedColors.includes(c) ? 1 : 0.4,
                   transform: selectedColors.includes(c)
                     ? "scale(1.1)"
                     : "scale(1)",
                   transition: "all 0.2s",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
                 title={
                   selectedColors.includes(c) ? "Selected" : "Click to filter"
                 }
-              />
+              >
+                {c === "none" && <span style={{fontSize: '10px', color: 'var(--text-secondary)'}}>None</span>}
+              </div>
             ))}
           </div>
         </div>
