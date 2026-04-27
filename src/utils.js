@@ -178,9 +178,73 @@ const wrapText = (font, text, size, maxWidth) => {
   return lines;
 };
 
-// Helper to check if we need a page break for a specific single element
-const checkPageBreak = (cursorY, requiredHeight) => {
-  return cursorY - requiredHeight < MARGIN;
+// Helper to check if an item fits (simple check for now, full logic will be in main loop)
+const doesItemFit = (currentCursorY, itemHeight, minimumMargin) => {
+  return currentCursorY - itemHeight >= minimumMargin;
+};
+
+// Helper function to draw content currently in currentPageItems and clear it
+const drawPageContent = (pageToDrawOn, itemsToDraw, initialCursorY, CURRENT_MARGIN, CURRENT_IMAGE_GAP, CURRENT_USABLE_WIDTH, CURRENT_AFTER_TEXT, CURRENT_AFTER_IMAGE, fontBold, fontItalic) => {
+    let currentDrawingY = initialCursorY;
+    for (const item of itemsToDraw) {
+        if (item.type === 'header') {
+            currentDrawingY -= (item.height - 10); // Adjust for the padding above header text
+            pageToDrawOn.drawText(`QUESTION ${item.number}`, {
+                x: CURRENT_MARGIN,
+                y: currentDrawingY,
+                size: 14,
+                font: fontBold,
+                color: rgb(0, 0, 0),
+            });
+            if (item.tagNames) {
+                const headerWidth = fontBold.widthOfTextAtSize(`QUESTION ${item.number}`, 14);
+                pageToDrawOn.drawText(` [${item.tagNames}]`, {
+                    x: CURRENT_MARGIN + headerWidth,
+                    y: currentDrawingY,
+                    size: 9,
+                    font: fontItalic,
+                    color: rgb(0.3, 0.3, 0.3),
+                });
+            }
+            currentDrawingY -= 10; // Space below header
+        } else if (item.type === 'note') {
+            currentDrawingY -= item.height;
+            pageToDrawOn.drawImage(item.imgObj, {
+                x: CURRENT_MARGIN,
+                y: currentDrawingY,
+                width: item.width,
+                height: item.height,
+            });
+            currentDrawingY -= CURRENT_AFTER_TEXT;
+        } else if (item.type === 'imageRow') {
+            let currentX = CURRENT_MARGIN + (CURRENT_USABLE_WIDTH - item.width) / 2;
+            const rowY = currentDrawingY - item.height;
+
+            for (const imgData of item.images) {
+                const yOffset = (item.height - imgData.height) / 2;
+                pageToDrawOn.drawImage(imgData.imgObj, {
+                    x: currentX,
+                    y: rowY + yOffset,
+                    width: imgData.width,
+                    height: imgData.height,
+                });
+                pageToDrawOn.drawRectangle({
+                    x: currentX,
+                    y: rowY + yOffset,
+                    width: imgData.width,
+                    height: imgData.height,
+                    borderWidth: 0.5,
+                    borderColor: rgb(0.8, 0.8, 0.8),
+                    color: rgb(0, 0, 0),
+                    opacity: 0,
+                    borderOpacity: 1,
+                });
+                currentX += imgData.width + CURRENT_IMAGE_GAP;
+            }
+            currentDrawingY -= item.height + CURRENT_AFTER_IMAGE;
+        }
+    }
+    return currentDrawingY;
 };
 
 export const exportQuestionsToPDF = async (
@@ -193,50 +257,71 @@ export const exportQuestionsToPDF = async (
     return;
   }
 
-  const { includeNotes, includeTags, tags } = options;
+  const { includeNotes, includeTags, tags, isCompact } = options;
+
+  const CURRENT_MARGIN = isCompact ? 10 : 20;
+  const CURRENT_USABLE_WIDTH = A4_WIDTH_PTS - 2 * CURRENT_MARGIN;
+  const CURRENT_AFTER_TEXT = isCompact ? 8 : 15;
+  const CURRENT_AFTER_IMAGE = isCompact ? 3 : 5;
+  const CURRENT_SEPARATOR_VERTICAL_SPACE = isCompact ? 10 : 20;
+  const CURRENT_IMAGE_GAP = isCompact ? 5 : 10;
+  const CURRENT_MAX_IMAGE_HEIGHT_FACTOR = 0.45; 
+  const MAX_IMAGE_HEIGHT_PER_PAGE = (A4_HEIGHT_PTS - 2 * CURRENT_MARGIN) * CURRENT_MAX_IMAGE_HEIGHT_FACTOR;
 
   const pdfDoc = await PDFDocument.create();
-  // Using Courier for the requested monospace look
   const font = await pdfDoc.embedFont(StandardFonts.Courier);
   const fontBold = await pdfDoc.embedFont(StandardFonts.CourierBold);
   const fontItalic = await pdfDoc.embedFont(StandardFonts.CourierOblique);
 
   let page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
-  let cursorY = A4_HEIGHT_PTS - MARGIN;
+  let cursorY = A4_HEIGHT_PTS - CURRENT_MARGIN;
+  let currentPageItems = []; // Items to be drawn on the current page, including header
 
   for (let index = 0; index < questions.length; index++) {
     const question = questions[index];
     const questionNumber = index + 1;
 
     try {
-      // --- PHASE 1: PRE-CALCULATION ---
+      // Get tag names for this question
+      const tagNames = (question.tags || [])
+        .map((tagId) => (tags || []).find((t) => t.id === tagId)?.name)
+        .filter(Boolean)
+        .join(", ");
 
-      // Note Image Calculation
-      let noteImage = null;
-      let noteDisplayWidth = 0;
-      let noteDisplayHeight = 0;
+      const questionHeaderItem = { 
+          type: 'header', 
+          height: 14 + 10, // Font size + padding
+          number: questionNumber, 
+          tagNames: includeTags ? tagNames : null // Only include tagNames if includeTags is true
+      };
+      
+      const questionContent = []; // Will store images and notes for this question
 
       if (includeNotes && question.note) {
         const noteDataUrl = await renderNoteToImage(question.note);
         if (noteDataUrl) {
-          noteImage = await safeEmbedImage(pdfDoc, noteDataUrl);
-          if (noteImage) {
-            const { width, height } = noteImage;
-            // Use natural width if it's smaller than USABLE_WIDTH to avoid pixelation
-            // (Note: renderNoteToImage uses USABLE_WIDTH for container width)
-            const scaleFactor = USABLE_WIDTH / width;
-            noteDisplayWidth = USABLE_WIDTH;
-            noteDisplayHeight = height * scaleFactor;
+          const notePdfImage = await safeEmbedImage(pdfDoc, noteDataUrl);
+          if (notePdfImage) {
+            const { width, height } = notePdfImage;
+            const scaleFactor = CURRENT_USABLE_WIDTH / width;
+            const noteDisplayWidth = CURRENT_USABLE_WIDTH;
+            const noteDisplayHeight = height * scaleFactor;
+            questionContent.push({
+              type: 'note',
+              imgObj: notePdfImage,
+              width: noteDisplayWidth,
+              height: noteDisplayHeight,
+              originalWidth: width,
+              originalHeight: height,
+            });
           }
         }
       }
 
-      // Process Images with Smart Scaling and Grid Layout
-      const imageRows = [];
       if (question.images && question.images.length > 0) {
-        let currentRow = [];
+        let currentRowImages = [];
         let currentRowWidth = 0;
-        const GAP = 10;
+        let currentRowMaxHeight = 0;
 
         for (const imageUrl of question.images) {
           if (!imageUrl) continue;
@@ -244,163 +329,175 @@ export const exportQuestionsToPDF = async (
           if (!pdfImage) continue;
 
           const { width, height } = pdfImage;
-          
-          // Calculate a single scale factor to maintain aspect ratio perfectly
           let scaleFactor = 1.0;
-          
-          // Constraint 1: Width limit
-          if (width > USABLE_WIDTH) {
-            scaleFactor = USABLE_WIDTH / width;
+          const MAX_IMAGE_HEIGHT_PER_PAGE = (A4_HEIGHT_PTS - 2 * CURRENT_MARGIN) * CURRENT_MAX_IMAGE_HEIGHT_FACTOR;
+
+          if (width > CURRENT_USABLE_WIDTH) {
+            scaleFactor = CURRENT_USABLE_WIDTH / width;
           }
-          
-          // Constraint 2: Height limit (max 45% of page)
-          const MAX_HEIGHT = (A4_HEIGHT_PTS - 2 * MARGIN) * 0.45;
-          if (height * scaleFactor > MAX_HEIGHT) {
-            scaleFactor = MAX_HEIGHT / height;
+          if (height * scaleFactor > MAX_IMAGE_HEIGHT_PER_PAGE) {
+            scaleFactor = MAX_IMAGE_HEIGHT_PER_PAGE / height;
           }
 
           const imgDisplayWidth = width * scaleFactor;
           const imgDisplayHeight = height * scaleFactor;
-          const imgData = { imgObj: pdfImage, width: imgDisplayWidth, height: imgDisplayHeight, originalScale: scaleFactor };
-
-          // 4. Grid Logic: Can we fit this in the current row?
-          // Don't grid images that were already heavily scaled down (e.g., < 0.7 original size)
-          // or if they are wider than 50% of usable width
-          const isHeavilyScaled = scaleFactor < 0.7;
-          const canFitInRow = !isHeavilyScaled && 
-                             (currentRowWidth + GAP + imgDisplayWidth) <= USABLE_WIDTH && 
-                             imgDisplayWidth < USABLE_WIDTH * 0.5;
           
-          if (currentRow.length > 0 && canFitInRow) {
-            currentRow.push(imgData);
-            currentRowWidth += GAP + imgDisplayWidth;
+          const imgData = { 
+            type: 'image',
+            imgObj: pdfImage, 
+            width: imgDisplayWidth, 
+            height: imgDisplayHeight, 
+            originalWidth: width,
+            originalHeight: height,
+            scaleFactor: scaleFactor
+          };
+
+          const isHeavilyScaled = scaleFactor < 0.7; 
+          const canFitInRow = !isHeavilyScaled && 
+                             (currentRowWidth + CURRENT_IMAGE_GAP + imgDisplayWidth) <= CURRENT_USABLE_WIDTH && 
+                             imgDisplayWidth < CURRENT_USABLE_WIDTH * 0.5;
+
+          if (currentRowImages.length > 0 && canFitInRow) {
+            currentRowImages.push(imgData);
+            currentRowWidth += CURRENT_IMAGE_GAP + imgDisplayWidth;
+            currentRowMaxHeight = Math.max(currentRowMaxHeight, imgDisplayHeight);
           } else {
-            if (currentRow.length > 0) imageRows.push({ images: currentRow, width: currentRowWidth, height: Math.max(...currentRow.map(i => i.height)) });
-            currentRow = [imgData];
+            if (currentRowImages.length > 0) {
+                questionContent.push({
+                    type: 'imageRow',
+                    images: currentRowImages,
+                    width: currentRowWidth,
+                    height: currentRowMaxHeight,
+                });
+            }
+            currentRowImages = [imgData];
             currentRowWidth = imgDisplayWidth;
+            currentRowMaxHeight = imgDisplayHeight;
           }
         }
-        if (currentRow.length > 0) {
-          imageRows.push({ images: currentRow, width: currentRowWidth, height: Math.max(...currentRow.map(i => i.height)) });
+        if (currentRowImages.length > 0) {
+            questionContent.push({
+                type: 'imageRow',
+                images: currentRowImages,
+                width: currentRowWidth,
+                height: currentRowMaxHeight,
+            });
         }
       }
 
-      // --- PHASE 2: DRAWING ---
+      // --- Drawing Loop with Page Break Optimization ---
 
-      // Smart Header Grouping: Ensure header + first content (note or first image row) stay together
-      let firstContentHeight = 0;
-      if (noteImage) {
-        firstContentHeight = noteDisplayHeight + SPACING.AFTER_TEXT;
-      } else if (imageRows.length > 0) {
-        firstContentHeight = imageRows[0].height + SPACING.AFTER_IMAGE;
+      // Consider header for current page
+      let requiredHeightForHeader = questionHeaderItem.height + 10; // +10 for space below header
+      if (!doesItemFit(cursorY, requiredHeightForHeader, CURRENT_MARGIN)) {
+          // If header alone doesn't fit, draw existing content and new page
+          cursorY = drawPageContent(page, currentPageItems, cursorY, CURRENT_MARGIN, CURRENT_IMAGE_GAP, CURRENT_USABLE_WIDTH, CURRENT_AFTER_TEXT, CURRENT_AFTER_IMAGE, fontBold, fontItalic);
+          page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
+          cursorY = A4_HEIGHT_PTS - CURRENT_MARGIN;
+          currentPageItems = [];
+      }
+      currentPageItems.push(questionHeaderItem);
+      
+      for (const item of questionContent) {
+          let requiredHeightForItem = 0;
+          if (item.type === 'note') {
+              requiredHeightForItem = item.height + CURRENT_AFTER_TEXT;
+          } else if (item.type === 'imageRow') {
+              requiredHeightForItem = item.height + CURRENT_AFTER_IMAGE;
+          }
+
+          // Check if current item fits on the current page
+          if (!doesItemFit(cursorY - currentPageItems.reduce((sum, ci) => { // Calculate height of items currently in buffer
+                if (ci.type === 'header') return sum + ci.height + 10;
+                if (ci.type === 'note') return sum + ci.height + CURRENT_AFTER_TEXT;
+                if (ci.type === 'imageRow') return sum + ci.height + CURRENT_AFTER_IMAGE;
+                return sum;
+             }, 0), requiredHeightForItem, CURRENT_MARGIN)) {
+              
+              // It doesn't fit, so attempt optimization if compact mode is enabled
+              if (isCompact && currentPageItems.some(ci => ci.type === 'imageRow')) {
+                  // Calculate available space on current page
+                  let occupiedHeight = (A4_HEIGHT_PTS - CURRENT_MARGIN) - cursorY;
+                  let spaceRemainingForContent = cursorY - CURRENT_MARGIN;
+
+                  let currentContentHeightInConsideration = currentPageItems.reduce((sum, ci) => {
+                      if (ci.type === 'header') return sum + ci.height + 10;
+                      if (ci.type === 'note') return sum + ci.height + CURRENT_AFTER_TEXT;
+                      if (ci.type === 'imageRow') return sum + ci.height + CURRENT_AFTER_IMAGE;
+                      return sum;
+                  }, 0);
+                  
+                  let totalAdjustableHeight = 0;
+                  const adjustableImageItems = currentPageItems.filter(ci => ci.type === 'imageRow');
+                  
+                  if (adjustableImageItems.length > 0) {
+                      // Sum current heights of adjustable images (excluding AFTER_IMAGE padding)
+                      totalAdjustableHeight = adjustableImageItems.reduce((sum, imgRow) => sum + imgRow.height, 0);
+
+                      if (totalAdjustableHeight > 0) {
+                          // The amount of "extra" space we have (or deficit) to adjust for
+                          const availableExpansionSpace = spaceRemainingForContent - (currentContentHeightInConsideration + requiredHeightForItem);
+                          
+                          // If there's positive available space to fill
+                          if (availableExpansionSpace > 0) {
+                              const expansionRatio = (totalAdjustableHeight + availableExpansionSpace) / totalAdjustableHeight;
+
+                              // Apply scaling to each image row
+                              for (const imgRow of adjustableImageItems) {
+                                  let newRowHeight = imgRow.height * expansionRatio;
+                                  // Ensure we don't scale images beyond their original resolution or MAX_IMAGE_HEIGHT_PER_PAGE
+                                  // This is a simplified check. A more robust solution would iterate imgRow.images
+                                  // and calculate max possible scale-up without exceeding original res or MAX_HEIGHT_PER_PAGE
+                                  let maxPossibleRowHeight = 0;
+                                  for(const individualImg of imgRow.images){
+                                      const maxIndividualHeight = Math.min(individualImg.originalHeight, MAX_IMAGE_HEIGHT_PER_PAGE / individualImg.scaleFactor);
+                                      maxPossibleRowHeight = Math.max(maxPossibleRowHeight, maxIndividualHeight);
+                                  }
+                                  
+                                  newRowHeight = Math.min(newRowHeight, maxPossibleRowHeight); // Clamp to max possible height
+
+                                  if (newRowHeight > imgRow.height) { // Only adjust if increasing
+                                      const rowScaleFactor = newRowHeight / imgRow.height;
+                                      imgRow.height = newRowHeight;
+                                      // Proportional adjustment of individual images in the row
+                                      imgRow.images.forEach(img => {
+                                          img.width *= rowScaleFactor;
+                                          img.height *= rowScaleFactor;
+                                      });
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+              
+              // Draw content on current page
+              cursorY = drawPageContent(page, currentPageItems, cursorY, CURRENT_MARGIN, CURRENT_IMAGE_GAP, CURRENT_USABLE_WIDTH, CURRENT_AFTER_TEXT, CURRENT_AFTER_IMAGE, fontBold, fontItalic);
+              // Start a new page
+              page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
+              cursorY = A4_HEIGHT_PTS - CURRENT_MARGIN;
+              currentPageItems = [];
+          }
+          currentPageItems.push(item);
       }
       
-      const headerWithContentHeight = 30 + firstContentHeight; // 30 is approx header + padding
+      // Draw any remaining items for this question on the current page
+      cursorY = drawPageContent(page, currentPageItems, cursorY, CURRENT_MARGIN, CURRENT_IMAGE_GAP, CURRENT_USABLE_WIDTH, CURRENT_AFTER_TEXT, CURRENT_AFTER_IMAGE, fontBold, fontItalic);
+      currentPageItems = []; // Clear for next question
 
-      if (checkPageBreak(cursorY, headerWithContentHeight)) {
-        page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
-        cursorY = A4_HEIGHT_PTS - MARGIN;
-      }
-
-      // Get tag names for this question
-      const tagNames = (question.tags || [])
-        .map((tagId) => (tags || []).find((t) => t.id === tagId)?.name)
-        .filter(Boolean)
-        .join(", ");
-
-      // Draw Header
-      cursorY -= 14;
-      const headerText = `QUESTION ${questionNumber}`;
-      page.drawText(headerText, {
-        x: MARGIN,
-        y: cursorY,
-        size: 14,
-        font: fontBold,
-        color: rgb(0, 0, 0),
-      });
-
-      if (includeTags && tagNames) { // Only draw if includeTags is true and tags exist
-        const headerWidth = fontBold.widthOfTextAtSize(headerText, 14);
-        page.drawText(` [${tagNames}]`, {
-          x: MARGIN + headerWidth,
-          y: cursorY,
-          size: 9, // Smaller font for tags
-          font: fontItalic, // Use italic font
-          color: rgb(0.3, 0.3, 0.3),
-        });
-      }
-      cursorY -= 10;
-
-      // Draw Note Image
-      if (noteImage) {
-        if (checkPageBreak(cursorY, noteDisplayHeight + SPACING.AFTER_TEXT)) {
+      // Separator after each question
+      if (!doesItemFit(cursorY, CURRENT_SEPARATOR_VERTICAL_SPACE + 5, CURRENT_MARGIN)) {
           page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
-          cursorY = A4_HEIGHT_PTS - MARGIN;
-        }
-
-        cursorY -= noteDisplayHeight;
-        page.drawImage(noteImage, {
-          x: MARGIN,
-          y: cursorY,
-          width: noteDisplayWidth,
-          height: noteDisplayHeight,
-        });
-        cursorY -= SPACING.AFTER_TEXT;
-      }
-
-      // Draw Image Rows
-      for (const row of imageRows) {
-        const requiredHeight = row.height + SPACING.AFTER_IMAGE;
-        if (checkPageBreak(cursorY, requiredHeight)) {
-          page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
-          cursorY = A4_HEIGHT_PTS - MARGIN;
-        }
-
-        let currentX = MARGIN + (USABLE_WIDTH - row.width) / 2;
-        const rowY = cursorY - row.height;
-
-        for (const imgData of row.images) {
-          // Center vertically within the row if images have different heights
-          const yOffset = (row.height - imgData.height) / 2;
-          
-          page.drawImage(imgData.imgObj, {
-            x: currentX,
-            y: rowY + yOffset,
-            width: imgData.width,
-            height: imgData.height,
-          });
-
-          // Border
-          page.drawRectangle({
-            x: currentX,
-            y: rowY + yOffset,
-            width: imgData.width,
-            height: imgData.height,
-            borderWidth: 0.5,
-            borderColor: rgb(0.8, 0.8, 0.8),
-            color: rgb(0, 0, 0),
-            opacity: 0,
-            borderOpacity: 1,
-          });
-
-          currentX += imgData.width + 10; // 10 is the GAP
-        }
-        cursorY -= row.height + SPACING.AFTER_IMAGE;
-      }
-
-      // Separator
-      if (checkPageBreak(cursorY, 25)) {
-        page = pdfDoc.addPage([A4_WIDTH_PTS, A4_HEIGHT_PTS]);
-        cursorY = A4_HEIGHT_PTS - MARGIN;
+          cursorY = A4_HEIGHT_PTS - CURRENT_MARGIN;
       } else {
-        cursorY -= 10;
-        page.drawLine({
-          start: { x: MARGIN, y: cursorY },
-          end: { x: A4_WIDTH_PTS - MARGIN, y: cursorY },
-          thickness: 0.5,
-          color: rgb(0.7, 0.7, 0.7),
-        });
-        cursorY -= 10;
+          cursorY -= (CURRENT_SEPARATOR_VERTICAL_SPACE / 2);
+          page.drawLine({
+              start: { x: CURRENT_MARGIN, y: cursorY },
+              end: { x: A4_WIDTH_PTS - CURRENT_MARGIN, y: cursorY },
+              thickness: 0.5,
+              color: rgb(0.7, 0.7, 0.7),
+          });
+          cursorY -= (CURRENT_SEPARATOR_VERTICAL_SPACE / 2);
       }
     } catch (e) {
       console.error(`Skipping Question ${questionNumber} error:`, e);

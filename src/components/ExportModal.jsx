@@ -9,6 +9,7 @@ export default function ExportModal({
   const [fileName, setFileName] = useState("");
   const [includeNotes, setIncludeNotes] = useState(true);
   const [includeTags, setIncludeTags] = useState(true);
+  const [isCompact, setIsCompact] = useState(false); // NEW: Track compact layout
   const [format, setFormat] = useState("pdf"); // NEW: Track format
 
   useEffect(() => {
@@ -16,6 +17,7 @@ export default function ExportModal({
       setFileName(defaultName || "assignment-export");
       setIncludeNotes(true);
       setIncludeTags(true);
+      setIsCompact(false); // Reset to default
       setFormat("pdf"); // Reset to default
     }
   }, [isOpen, defaultName]);
@@ -28,7 +30,7 @@ export default function ExportModal({
       return;
     }
     // Pass both name and options (including format)
-    onExport(fileName, { includeNotes, includeTags, format });
+    onExport(fileName, { includeNotes, includeTags, isCompact, format });
     onClose();
   };
 
@@ -117,6 +119,19 @@ export default function ExportModal({
               type="checkbox"
               checked={includeTags}
               onChange={(e) => setIncludeTags(e.target.checked)}
+            />
+            <span className="slider"></span>
+          </label>
+        </div>
+
+        {/* Toggle Switch for Compact Layout */}
+        <div className="toggle-container" style={{ marginBottom: 20 }}>
+          <span className="toggle-label">Compact Layout?</span>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={isCompact}
+              onChange={(e) => setIsCompact(e.target.checked)}
             />
             <span className="slider"></span>
           </label>
