@@ -70,6 +70,16 @@ const ReviewAssignment = () => {
     }
   };
 
+  const handleContentClick = (e) => {
+    const { clientX } = e;
+    const { innerWidth } = window;
+    if (clientX < innerWidth / 2) {
+      prevStep();
+    } else {
+      nextStep();
+    }
+  };
+
   const nextQuestion = () => {
     if (qIndex < reviewQuestions.length - 1) {
       setQIndex(qIndex + 1);
@@ -89,7 +99,8 @@ const ReviewAssignment = () => {
     const handleKeyDown = (e) => {
       if (e.code === 'Space') {
         e.preventDefault();
-        nextStep();
+        if (e.shiftKey) prevStep();
+        else nextStep();
       } else if (e.key === 'ArrowRight') {
         if (e.ctrlKey || e.metaKey) nextQuestion();
         else nextStep();
@@ -163,7 +174,7 @@ const ReviewAssignment = () => {
         </div>
       </header>
 
-      <main className="review-content" onClick={nextStep}>
+      <main className="review-content" onClick={handleContentClick}>
         {currentContent?.type === 'image' ? (
           <div className="review-image-container">
             <img 
