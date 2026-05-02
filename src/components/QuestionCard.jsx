@@ -218,7 +218,7 @@ export default function QuestionCard({
               </div>
             </div>
 
-            <p style={{ marginTop: 6, color: "#555" }}>
+            <p style={{ marginTop: 6, color: "var(--text-secondary)" }}>
               {moveTab === "move"
                 ? `Choose destination to ${
                     isCopyMode ? "copy" : "move"
@@ -373,7 +373,7 @@ export default function QuestionCard({
                       style={{
                         padding: "8px 10px",
                         borderRadius: 6,
-                        border: "1px solid #ddd",
+                        border: "1px solid var(--border-color)",
                         minWidth: 160,
                       }}
                     />
@@ -407,7 +407,7 @@ export default function QuestionCard({
               </div>
             </div>
 
-            <div style={{ marginTop: 12, color: "#666", fontSize: 13 }}>
+            <div style={{ marginTop: 12, color: "var(--text-secondary)", fontSize: 13 }}>
               {moveTab === "move"
                 ? isCopyMode
                   ? "The question will be duplicated to the destination. The original remains here."
@@ -524,3 +524,4 @@ export default function QuestionCard({
     </div>
   );
 }
+

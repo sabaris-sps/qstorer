@@ -90,7 +90,7 @@ const CommandCenter = ({
   });
   const [confirming, setConfirming] = useState(null);
   
-  const { chapters, tags } = useContext(AppContext);
+  const { chapters, tags, toggleTheme } = useContext(AppContext);
   const inputRef = useRef(null);
   const resultsRef = useRef(null);
   const historyRef = useRef(null);
@@ -421,6 +421,11 @@ const CommandCenter = ({
       name: 'toggle invert',
       desc: 'invert question images',
       action: () => handleToggleInvert()
+    },
+    {
+      name: 'toggle theme',
+      desc: 'switch between high contrast and default dark',
+      action: () => toggleTheme()
     },
     {
       name: 'delete assignment',

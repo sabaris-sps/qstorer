@@ -133,7 +133,7 @@
 }
 
 .history-item.error {
-  color: #ff6b6b;
+  color: var(--danger);
 }
 
 .history-item.info {

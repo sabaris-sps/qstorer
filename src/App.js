@@ -30,18 +30,47 @@ export default function App() {
     return saved === "true";
   });
 
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem("theme") || "theme-high-contrast";
+  });
+
   const [showTags, setShowTags] = useState(() => {
     const saved = localStorage.getItem("showTags");
     return saved !== "false"; // Default to true
   });
 
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isDesktopDropdownOpen, setIsDesktopDropdownOpen] = useState(false);
   const mobileNavRef = React.useRef(null);
+  const desktopDropdownRef = React.useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem("theme", theme);
+    localStorage.setItem("invertImages", invertImages);
+    document.body.className = theme;
+    if (invertImages) {
+      document.body.classList.add("invert-all-images");
+    } else {
+      document.body.classList.remove("invert-all-images");
+    }
+  }, [theme, invertImages]);
+
+  const toggleTheme = () => {
+    setTheme((prev) =>
+      prev === "theme-default" ? "theme-high-contrast" : "theme-default",
+    );
+  };
 
   useEffect(() => {
     function handleClickOutside(event) {
       if (mobileNavRef.current && !mobileNavRef.current.contains(event.target)) {
         setIsMobileNavOpen(false);
+      }
+      if (
+        desktopDropdownRef.current &&
+        !desktopDropdownRef.current.contains(event.target)
+      ) {
+        setIsDesktopDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -109,15 +138,6 @@ export default function App() {
   }
 
   useEffect(() => {
-    localStorage.setItem("invertImages", invertImages);
-    if (invertImages) {
-      document.body.classList.add("invert-all-images");
-    } else {
-      document.body.classList.remove("invert-all-images");
-    }
-  }, [invertImages]);
-
-  useEffect(() => {
     localStorage.setItem("showTags", showTags);
   }, [showTags]);
 
@@ -166,6 +186,9 @@ export default function App() {
         deleteAlias,
         reviewQuestions,
         setReviewQuestions,
+        theme,
+        setTheme,
+        toggleTheme,
       }}
     >
       <div className="app-root">
@@ -189,69 +212,60 @@ export default function App() {
               <>
                 {/* Desktop Navigation */}
                 <div className="desktop-nav" style={{ display: "flex", alignItems: "center" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      marginRight: "12px",
-                    }}
-                  >
-                    <div
+                  <div className="dropdown-container" ref={desktopDropdownRef} style={{ marginRight: "12px" }}>
+                    <button
+                      className="toplink"
+                      onClick={() => setIsDesktopDropdownOpen(!isDesktopDropdownOpen)}
                       style={{
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontSize: "1.2rem",
+                        padding: "0 8px",
                         display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
+                        alignItems: "center"
                       }}
+                      title="Preferences"
                     >
-                      <label
-                        htmlFor="tags-toggle"
-                        style={{
-                          fontSize: "0.85rem",
-                          cursor: "pointer",
-                          color: "var(--text-primary)",
-                        }}
-                      >
-                        Show Tags
-                      </label>
-                      <label className="switch" style={{ margin: 0 }}>
-                        <input
-                          id="tags-toggle"
-                          type="checkbox"
-                          checked={showTags}
-                          onChange={(e) => setShowTags(e.target.checked)}
-                        />
-                        <span className="slider"></span>
-                      </label>
-                    </div>
-
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                      }}
-                    >
-                      <label
-                        htmlFor="invert-toggle"
-                        style={{
-                          fontSize: "0.85rem",
-                          cursor: "pointer",
-                          color: "var(--text-primary)",
-                        }}
-                      >
-                        Invert Images
-                      </label>
-                      <label className="switch" style={{ margin: 0 }}>
-                        <input
-                          id="invert-toggle"
-                          type="checkbox"
-                          checked={invertImages}
-                          onChange={(e) => setInvertImages(e.target.checked)}
-                        />
-                        <span className="slider"></span>
-                      </label>
-                    </div>
+                      ⋮
+                    </button>
+                    {isDesktopDropdownOpen && (
+                      <div className="dropdown-menu" style={{ minWidth: "220px", top: "100%", right: "0" }}>
+                        <div className="dropdown-item toggle-item">
+                          <span>High Contrast</span>
+                          <label className="switch" style={{ margin: 0 }}>
+                            <input
+                              type="checkbox"
+                              checked={theme === "theme-high-contrast"}
+                              onChange={toggleTheme}
+                            />
+                            <span className="slider"></span>
+                          </label>
+                        </div>
+                        <div className="dropdown-item toggle-item">
+                          <span>Show Tags</span>
+                          <label className="switch" style={{ margin: 0 }}>
+                            <input
+                              type="checkbox"
+                              checked={showTags}
+                              onChange={(e) => setShowTags(e.target.checked)}
+                            />
+                            <span className="slider"></span>
+                          </label>
+                        </div>
+                        <div className="dropdown-item toggle-item">
+                          <span>Invert Images</span>
+                          <label className="switch" style={{ margin: 0 }}>
+                            <input
+                              type="checkbox"
+                              checked={invertImages}
+                              onChange={(e) => setInvertImages(e.target.checked)}
+                            />
+                            <span className="slider"></span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <Link to="/tags" className="toplink">
@@ -291,6 +305,17 @@ export default function App() {
                   </button>
                   {isMobileNavOpen && (
                     <div className="mobile-dropdown">
+                      <div className="mobile-dropdown-item toggle-item">
+                        <span>High Contrast</span>
+                        <label className="switch" style={{ margin: 0 }}>
+                          <input
+                            type="checkbox"
+                            checked={theme === "theme-high-contrast"}
+                            onChange={toggleTheme}
+                          />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
                       <div className="mobile-dropdown-item toggle-item">
                         <span>Show Tags</span>
                         <label className="switch" style={{ margin: 0 }}>
