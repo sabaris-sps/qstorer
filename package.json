@@ -14,7 +14,7 @@
     "html2canvas": "^1.4.1",
     "js-sha1": "^0.7.0",
     "jspdf": "^4.2.1",
-    "katex": "^0.17.0",
+    "katex": "^0.18.3",
     "markdown-it": "^14.1.1",
     "markdown-it-texmath": "^1.0.0",
     "pdf-lib": "^1.17.1",
